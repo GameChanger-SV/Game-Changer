@@ -60,6 +60,34 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Build bidirectional mutual map and max map from missions
+  const { mutualMap, itemMaxMap } = useCallback(() => {
+    const mutualMap = {}
+    const itemMaxMap = {}
+    missions.forEach(m => m.items.forEach(item => {
+      itemMaxMap[item.id] = item.max
+      if (item.mutualWith) {
+        mutualMap[item.id] = item.mutualWith
+        mutualMap[item.mutualWith] = item.id
+      }
+    }))
+    return { mutualMap, itemMaxMap }
+  }, [missions])()
+
+  // Change handler that enforces mutual exclusion / shared-max constraint
+  const handleChange = useCallback((itemId, newValue) => {
+    setScores(s => {
+      const next = { ...s, [itemId]: newValue }
+      const partnerId = mutualMap[itemId]
+      if (partnerId !== undefined && newValue > 0) {
+        const sharedMax = itemMaxMap[itemId]
+        next[partnerId] = Math.max(0, Math.min(s[partnerId] || 0, sharedMax - newValue))
+      }
+      return next
+    })
+    setSaved(false)
+  }, [mutualMap, itemMaxMap])
+
   // Initialize all items to 0
   useEffect(() => {
     const init = {}
@@ -174,11 +202,11 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
                     {readOnly ? (
                       <span className={`font-mono text-sm font-bold w-7 text-right ${val > 0 ? `text-${colorKey.class}` : 'text-gray-600'}`}>{val}</span>
                     ) : isToggle ? (
-                      <ToggleInput value={val} onChange={v => setScores(s => ({ ...s, [item.id]: v }))} color={colorKey.class} />
+                      <ToggleInput value={val} onChange={v => handleChange(item.id, v)} color={colorKey.class} />
                     ) : (
                       <CounterInput
                         value={val}
-                        onChange={v => setScores(s => ({ ...s, [item.id]: v }))}
+                        onChange={v => handleChange(item.id, v)}
                         max={item.max}
                         color={colorKey.class}
                       />

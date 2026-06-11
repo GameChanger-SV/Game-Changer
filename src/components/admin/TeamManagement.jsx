@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PlusCircle, Trash2, X, CheckCircle, AlertCircle, Trophy, UserCheck, ChevronDown } from 'lucide-react'
+import { PlusCircle, Trash2, X, CheckCircle, AlertCircle, Trophy, UserCheck, ChevronDown, Pencil, Search, SlidersHorizontal } from 'lucide-react'
 import { collection, addDoc, getDocs, deleteDoc, doc, query, where, updateDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
 
@@ -10,14 +10,38 @@ export default function TeamManagement() {
   const [teams, setTeams] = useState([])
   const [judges, setJudges] = useState([])
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState(null)
   const [filterCat, setFilterCat] = useState('all')
+  const [search, setSearch] = useState('')
+  const [filterCoach, setFilterCoach] = useState('')
+  const [filterSchool, setFilterSchool] = useState('')
+  const [filterJudge, setFilterJudge] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [form, setForm] = useState({
     name: '', number: '', category: 'elementary',
     coach: '', members: ['', ''],
     school: '', city: '', assignedJudgeId: ''
   })
+
+  const emptyForm = { name: '', number: '', category: 'elementary', coach: '', members: ['', ''], school: '', city: '', assignedJudgeId: '' }
+
+  const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowForm(true) }
+  const openEdit = (team) => {
+    setForm({
+      name: team.name || '',
+      number: team.number || '',
+      category: team.category || 'elementary',
+      coach: team.coach || '',
+      members: [team.members?.[0] || '', team.members?.[1] || '', team.members?.[2] || ''],
+      school: team.school || '',
+      city: team.city || '',
+      assignedJudgeId: team.assignedJudgeId || '',
+    })
+    setEditingId(team.id)
+    setShowForm(true)
+  }
 
   const fetchData = async () => {
     const [teamsSnap, judgesSnap] = await Promise.all([
@@ -30,20 +54,21 @@ export default function TeamManagement() {
 
   useEffect(() => { fetchData() }, [])
 
-  const handleCreate = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMsg(null)
     try {
       const members = form.members.filter(m => m.trim())
-      await addDoc(collection(db, 'teams'), {
-        ...form,
-        members,
-        createdAt: new Date().toISOString(),
-      })
-      setMsg({ type: 'success', text: `Equipo "${form.name}" registrado.` })
-      setForm({ name: '', number: '', category: 'elementary', coach: '', members: ['', ''], school: '', city: '', assignedJudgeId: '' })
+      if (editingId) {
+        await updateDoc(doc(db, 'teams', editingId), { ...form, members })
+        setMsg({ type: 'success', text: `Equipo "${form.name}" actualizado.` })
+      } else {
+        await addDoc(collection(db, 'teams'), { ...form, members, createdAt: new Date().toISOString() })
+        setMsg({ type: 'success', text: `Equipo "${form.name}" registrado.` })
+      }
       setShowForm(false)
+      setEditingId(null)
       fetchData()
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
@@ -63,7 +88,33 @@ export default function TeamManagement() {
     fetchData()
   }
 
-  const filtered = filterCat === 'all' ? teams : teams.filter(t => t.category === filterCat)
+  // Derived filter options
+  const coachOptions = [...new Set(teams.map(t => t.coach).filter(Boolean))].sort()
+  const schoolOptions = [...new Set(teams.map(t => t.school).filter(Boolean))].sort()
+  const judgeOptions = judges.filter(j => teams.some(t => t.assignedJudgeId === j.id || t.assignedJudgeId === j.uid))
+
+  const activeFilterCount = [filterCoach, filterSchool, filterJudge].filter(Boolean).length
+
+  const filtered = teams.filter(t => {
+    if (filterCat !== 'all' && t.category !== filterCat) return false
+    if (filterCoach && t.coach !== filterCoach) return false
+    if (filterSchool && t.school !== filterSchool) return false
+    if (filterJudge && t.assignedJudgeId !== filterJudge) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        t.name?.toLowerCase().includes(q) ||
+        t.number?.toLowerCase().includes(q) ||
+        t.coach?.toLowerCase().includes(q) ||
+        t.school?.toLowerCase().includes(q) ||
+        t.city?.toLowerCase().includes(q) ||
+        t.members?.some(m => m?.toLowerCase().includes(q))
+      )
+    }
+    return true
+  })
+
+  const clearFilters = () => { setSearch(''); setFilterCat('all'); setFilterCoach(''); setFilterSchool(''); setFilterJudge('') }
 
   return (
     <motion.div
@@ -75,15 +126,44 @@ export default function TeamManagement() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-extrabold text-white">Equipos</h1>
-          <p className="text-gray-400 mt-1">{teams.length} equipo(s) registrados</p>
+          <p className="text-gray-400 mt-1">{filtered.length} de {teams.length} equipo(s)</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <PlusCircle size={18} /> Nuevo Equipo
         </button>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-6">
+      {/* Search bar */}
+      <div className="flex gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <input
+            className="input-field pl-9 py-2 text-sm"
+            placeholder="Buscar por nombre, número, coach, escuela, ciudad o integrante..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setShowFilters(v => !v)}
+          className={`btn-ghost flex items-center gap-2 px-4 py-2 text-sm relative ${showFilters ? 'text-brand-orange border-brand-orange/40' : ''}`}
+        >
+          <SlidersHorizontal size={15} /> Filtros
+          {activeFilterCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-orange text-white text-xs flex items-center justify-center font-bold">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Category pills */}
+      <div className="flex gap-2 mb-3 flex-wrap">
         {['all', ...CATEGORIES].map(cat => (
           <button
             key={cat}
@@ -101,6 +181,59 @@ export default function TeamManagement() {
           </button>
         ))}
       </div>
+
+      {/* Advanced filters panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden mb-4"
+          >
+            <div className="card grid grid-cols-3 gap-3 py-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5 font-medium">Coach</label>
+                <select
+                  value={filterCoach}
+                  onChange={e => setFilterCoach(e.target.value)}
+                  className="input-field py-2 text-sm"
+                >
+                  <option value="">Todos</option>
+                  {coachOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5 font-medium">Escuela</label>
+                <select
+                  value={filterSchool}
+                  onChange={e => setFilterSchool(e.target.value)}
+                  className="input-field py-2 text-sm"
+                >
+                  <option value="">Todas</option>
+                  {schoolOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5 font-medium">Juez asignado</label>
+                <select
+                  value={filterJudge}
+                  onChange={e => setFilterJudge(e.target.value)}
+                  className="input-field py-2 text-sm"
+                >
+                  <option value="">Todos</option>
+                  {judgeOptions.map(j => <option key={j.id} value={j.uid || j.id}>{j.name}</option>)}
+                </select>
+              </div>
+            </div>
+            {activeFilterCount > 0 && (
+              <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-white mt-2 ml-1 transition-colors">
+                Limpiar todos los filtros
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Message */}
       <AnimatePresence>
@@ -173,6 +306,9 @@ export default function TeamManagement() {
                     {assignedJudge && (
                       <UserCheck size={16} className="text-green-400" />
                     )}
+                    <button onClick={() => openEdit(team)} className="text-gray-600 hover:text-brand-orange transition-colors p-1">
+                      <Pencil size={16} />
+                    </button>
                     <button onClick={() => handleDelete(team.id)} className="text-gray-600 hover:text-red-400 transition-colors p-1">
                       <Trash2 size={16} />
                     </button>
@@ -201,13 +337,13 @@ export default function TeamManagement() {
               className="card w-full max-w-lg my-4"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">Registrar Equipo</h2>
+                <h2 className="text-xl font-bold">{editingId ? 'Editar Equipo' : 'Registrar Equipo'}</h2>
                 <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-white">
                   <X size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleCreate} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm text-gray-400 mb-1.5 font-medium">Nombre del equipo *</label>
@@ -280,7 +416,12 @@ export default function TeamManagement() {
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowForm(false)} className="btn-ghost flex-1">Cancelar</button>
                   <button type="submit" disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                    {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><PlusCircle size={16} /> Registrar</>}
+                    {loading
+                      ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : editingId
+                        ? <><Pencil size={16} /> Guardar cambios</>
+                        : <><PlusCircle size={16} /> Registrar</>
+                    }
                   </button>
                 </div>
               </form>

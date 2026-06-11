@@ -7,7 +7,7 @@ import {
   getAuth,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { initializeApp, getApps } from 'firebase/app'
+import { initializeApp, getApps, deleteApp } from 'firebase/app'
 import { auth, db } from '../firebase'
 import app from '../firebase'
 
@@ -20,15 +20,36 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser)
-        const snap = await getDoc(doc(db, 'users', firebaseUser.uid))
-        setProfile(snap.exists() ? snap.data() : null)
-      } else {
+      try {
+        if (firebaseUser) {
+          setUser(firebaseUser)
+          const ref = doc(db, 'users', firebaseUser.uid)
+          const snap = await getDoc(ref)
+          if (!snap.exists()) {
+            // Primera vez: crear documento de admin automáticamente
+            const adminData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: 'Administrador',
+              role: 'admin',
+              createdAt: new Date().toISOString(),
+            }
+            await setDoc(ref, adminData)
+            setProfile(adminData)
+          } else {
+            setProfile(snap.data())
+          }
+        } else {
+          setUser(null)
+          setProfile(null)
+        }
+      } catch (err) {
+        console.error('AuthContext error:', err)
         setUser(null)
         setProfile(null)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     })
     return unsub
   }, [])
@@ -60,7 +81,7 @@ export function AuthProvider({ children }) {
       return cred.user
     } finally {
       // Eliminar la app secundaria para no acumular instancias
-      await secondaryApp.delete()
+      await deleteApp(secondaryApp)
     }
   }
 

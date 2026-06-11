@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogOut, Trophy, Users, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink } from 'lucide-react'
+import { LogOut, Trophy, Users, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink, Search, X } from 'lucide-react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -49,12 +49,25 @@ const ROUNDS = [1, 2, 3]
 export default function JudgeDashboard() {
   const { user, profile, logout } = useAuth()
   const [teams, setTeams] = useState([])
-  const [selected, setSelected] = useState(null) // { team, round }
-  const [activeRound, setActiveRound] = useState(1)
+  const [selected, setSelected] = useState(null)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
   const cat = profile?.category
   const config = CAT_CONFIG[cat] || CAT_CONFIG.elementary
+
+  const filteredTeams = search
+    ? teams.filter(t => {
+        const q = search.toLowerCase()
+        return (
+          t.name?.toLowerCase().includes(q) ||
+          t.number?.toLowerCase().includes(q) ||
+          t.school?.toLowerCase().includes(q) ||
+          t.city?.toLowerCase().includes(q) ||
+          t.members?.some(m => m?.toLowerCase().includes(q))
+        )
+      })
+    : teams
 
   useEffect(() => {
     if (!user || !profile) return
@@ -124,10 +137,28 @@ export default function JudgeDashboard() {
       </motion.div>
 
       {/* Teams */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <h2 className="font-bold text-white">Equipos asignados</h2>
-        <span className={`text-${config.color} text-sm font-medium`}>{teams.length} equipo(s)</span>
+        <span className={`text-${config.color} text-sm font-medium`}>{filteredTeams.length} de {teams.length}</span>
       </div>
+
+      {/* Search */}
+      {teams.length > 0 && (
+        <div className="relative mb-4">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <input
+            className="input-field pl-9 py-2 text-sm"
+            placeholder="Buscar equipo por nombre, número, escuela..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
 
       {teams.length === 0 ? (
         <div className="card text-center py-12">
@@ -135,9 +166,15 @@ export default function JudgeDashboard() {
           <p className="text-gray-400">No tienes equipos asignados aún.</p>
           <p className="text-gray-500 text-sm mt-1">El administrador te asignará los equipos pronto.</p>
         </div>
+      ) : filteredTeams.length === 0 ? (
+        <div className="card text-center py-8">
+          <Search size={32} className="text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">Sin resultados para "<span className={`text-${config.color}`}>{search}</span>"</p>
+          <button onClick={() => setSearch('')} className="btn-ghost mt-3 text-sm py-1.5 px-4">Limpiar</button>
+        </div>
       ) : (
         <div className="space-y-3">
-          {teams.map((team, i) => (
+          {filteredTeams.map((team, i) => (
             <motion.button
               key={team.id}
               initial={{ opacity: 0, x: -20 }}

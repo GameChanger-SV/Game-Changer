@@ -17,9 +17,11 @@ service cloud.firestore {
     // Perfiles de usuario
     match /users/{userId} {
       allow read: if request.auth != null;
+      // Admin puede escribir cualquier perfil
       allow write: if isAdmin();
-      // El usuario puede leer su propio perfil
-      allow read: if request.auth.uid == userId;
+      // Un usuario puede crear su propio perfil si no existe aún (primer acceso)
+      allow create: if request.auth.uid == userId
+                    && !exists(/databases/$(database)/documents/users/$(userId));
     }
 
     // Equipos

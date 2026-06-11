@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Trophy, LogOut, ChevronRight, LayoutDashboard, UserPlus, Flag } from 'lucide-react'
+import { Users, Trophy, LogOut, ChevronRight, LayoutDashboard, UserPlus, Flag, BarChart2, Medal } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import JudgeManagement from './JudgeManagement'
 import TeamManagement from './TeamManagement'
+import ResultsView from './ResultsView'
+import RankingView from './RankingView'
 
 const NAV = [
   { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
   { id: 'judges', label: 'Jueces', icon: Users },
   { id: 'teams', label: 'Equipos', icon: Trophy },
+  { id: 'results', label: 'Resultados', icon: BarChart2 },
+  { id: 'ranking', label: 'Ranking', icon: Medal },
 ]
 
 export default function AdminDashboard() {
@@ -75,6 +79,8 @@ export default function AdminDashboard() {
           {tab === 'overview' && <OverviewTab key="overview" setTab={setTab} />}
           {tab === 'judges' && <JudgeManagement key="judges" />}
           {tab === 'teams' && <TeamManagement key="teams" />}
+          {tab === 'results' && <ResultsView key="results" />}
+          {tab === 'ranking' && <RankingView key="ranking" />}
         </AnimatePresence>
       </main>
     </div>
