@@ -1,100 +1,29 @@
-# WRO RoboMission – Sistema de Evaluación 2026
+# WRO El Salvador — Sistema de Evaluación RoboMission 2026
 **Game Changer Robotics**
 
-Plataforma web para jueces de la categoría RoboMission de WRO Mexico 2026.  
-Incluye panel de administrador y tres interfaces de juez: Elementary, Junior y Senior.
+Plataforma web para jueces de WRO El Salvador 2026, categoría RoboMission. Incluye panel de administración y tres interfaces de juez (Elementary, Junior y Senior) con puntuación en tiempo real.
 
 ---
 
-## Stack
-- **React + Vite** — frontend rápido con animaciones (Framer Motion)
-- **Firebase** — autenticación (Email/Password) + Firestore (base de datos)
-- **TailwindCSS** — estilos
+## Funcionalidades
 
----
+### Panel de Administrador
+- Crear, editar y eliminar jueces (nombre, ID, categoría)
+- Registrar, editar y eliminar equipos (integrantes, coach, escuela, ciudad)
+- Asignar jueces a equipos por categoría
+- Buscador y filtros avanzados (categoría, coach, escuela, juez asignado)
+- Vista de **Resultados** — puntajes por equipo y ronda con exportación a CSV
+- **Ranking** en tiempo real — clasificación por mejor puntaje de 3 rondas con medallas
 
-## Instalación rápida
+### Panel de Juez
+- Lista de equipos asignados con buscador
+- Hoja de puntuación interactiva por ronda (3 rondas)
+- Validación automática de reglas de exclusión mutua entre ítems de misión
+- Registro de tiempo (segundos)
+- Modal de recursos: reglamento, mapa de pista, elementos y video oficial
+- Guardado automático en Firestore
 
-```bash
-cd wro-judging
-npm install
-npm run dev
-```
-
----
-
-## Configuración de Firebase (obligatorio)
-
-1. Ve a [https://console.firebase.google.com](https://console.firebase.google.com)
-2. Crea un proyecto nuevo (ej: `wro-judging-2026`)
-3. Agrega una app web → copia el objeto `firebaseConfig`
-4. Pega las credenciales en `src/firebase.js`
-5. En Firebase Console:
-   - **Authentication** → Sign-in method → habilita **Email/Password**
-   - **Firestore Database** → crear en modo producción
-   - **Firestore Rules** → pega el contenido de `firestore.rules`
-
----
-
-## Crear la cuenta de administrador
-
-Después de configurar Firebase, crea el admin manualmente desde Firebase Console:
-
-1. **Authentication** → Agregar usuario → pon email y contraseña del admin
-2. **Firestore** → Colección `users` → nuevo documento con el **UID** del usuario como ID:
-   ```json
-   {
-     "uid": "UID_DEL_ADMIN",
-     "email": "admin@ejemplo.com",
-     "name": "Administrador",
-     "role": "admin"
-   }
-   ```
-
-A partir de ahí, el admin puede crear jueces desde el panel web.
-
----
-
-## Flujo de uso
-
-### Admin
-1. Inicia sesión → Panel de Administración
-2. **Jueces** → crea cuentas para cada juez (nombre, email, contraseña, categoría)
-3. **Equipos** → registra equipos con participantes y asígnalos a un juez
-
-### Juez
-1. Inicia sesión con las credenciales que creó el admin
-2. Ve sus equipos asignados
-3. Para cada equipo: 3 rondas con tabla de puntuación automática
-4. Recursos disponibles: reglamento, pista, elementos de pista, video
-
----
-
-## Estructura del proyecto
-
-```
-src/
-  App.jsx                    — Enrutador principal
-  firebase.js                — Configuración Firebase ⚠️ editar
-  index.css                  — Estilos globales (Tailwind)
-  contexts/
-    AuthContext.jsx           — Auth + perfil de usuario
-  components/
-    Login.jsx                 — Pantalla de login
-    admin/
-      AdminDashboard.jsx      — Layout + navegación admin
-      JudgeManagement.jsx     — CRUD de jueces
-      TeamManagement.jsx      — CRUD de equipos + asignación
-    judge/
-      JudgeDashboard.jsx      — Lista de equipos del juez
-      scoring/
-        ScoreSheet.jsx        — Tabla de puntuación interactiva
-        scoringData.js        — Misiones y puntos (Elementary/Junior/Senior)
-```
-
----
-
-## Categorías y puntajes máximos
+### Categorías
 
 | Categoría | Edades | Puntuación máxima | Temática |
 |-----------|--------|-------------------|----------|
@@ -104,22 +33,140 @@ src/
 
 ---
 
-## Deploy
+## Infraestructura
 
-```bash
-npm run build
-# Sube la carpeta `dist/` a Firebase Hosting, Vercel, o Netlify
+```
+┌─────────────────────────────────────────────────────────┐
+│                    GitHub (código)                       │
+│              GameChanger-SV/Game-Changer                 │
+│                         │                               │
+│              push a main │                               │
+│                         ▼                               │
+│              GitHub Actions (CI/CD)                      │
+│           npm ci → npm run build → deploy                │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+          ┌───────────────▼───────────────┐
+          │      Firebase Hosting          │
+          │  gc-wro-judging-2026.web.app  │
+          │   (archivos estáticos/React)  │
+          └───────────────┬───────────────┘
+                          │
+          ┌───────────────▼───────────────┐
+          │         Firebase              │
+          │  ┌─────────────────────────┐  │
+          │  │  Authentication         │  │
+          │  │  Email/Password         │  │
+          │  └─────────────────────────┘  │
+          │  ┌─────────────────────────┐  │
+          │  │  Firestore Database     │  │
+          │  │  /users   (jueces)      │  │
+          │  │  /teams   (equipos)     │  │
+          │  │  /scores  (puntajes)    │  │
+          │  └─────────────────────────┘  │
+          └───────────────────────────────┘
 ```
 
-Para Firebase Hosting:
+### Tecnologías
+- **React + Vite** — frontend con animaciones (Framer Motion)
+- **TailwindCSS** — estilos con tema personalizado
+- **Firebase Authentication** — login con email/password, roles admin/juez
+- **Cloud Firestore** — base de datos en tiempo real con reglas de seguridad
+- **Firebase Hosting** — hosting de la app estática
+- **GitHub Actions** — deploy automático en cada push a `main`
+
+---
+
+## Costos
+
+Todo el proyecto corre en **planes gratuitos**. Para un evento con ~100 jueces, 1 admin y ~100 equipos el uso estimado es:
+
+| Servicio | Límite gratuito | Uso estimado | Costo |
+|----------|----------------|--------------|-------|
+| Firestore reads | 50,000/día | ~500/día | $0 |
+| Firestore writes | 20,000/día | ~300/día | $0 |
+| Firebase Hosting | 360MB/día transferencia | ~50MB | $0 |
+| Firebase Authentication | Ilimitado | 101 usuarios | $0 |
+| GitHub Actions | 2,000 min/mes (privado) | ~2 min/deploy | $0 |
+
+**Total: $0/mes** para el uso normal de una competencia de robótica local.
+
+---
+
+## Instalación local
+
 ```bash
-npm install -g firebase-tools
-firebase login
-firebase init hosting
-npm run build
-firebase deploy
+npm install
+npm run dev
+# → http://localhost:5173
 ```
 
 ---
 
-*WRO Mexico 2026 · Game Changer Robotics*
+## Configuración de Firebase
+
+1. Ve a [console.firebase.google.com](https://console.firebase.google.com) y crea un proyecto
+2. Agrega una app web → copia el objeto `firebaseConfig` en `src/firebase.js`
+3. Habilita **Authentication → Email/Password**
+4. Crea la base de datos en **Firestore** (modo producción)
+5. En **Firestore → Reglas**, pega el contenido de `firestore.rules` y publica
+
+### Crear la cuenta de administrador
+
+1. **Authentication** → Add user → pon el email y contraseña del admin
+2. Al iniciar sesión por primera vez, el sistema crea el perfil de admin automáticamente
+
+A partir de ahí el admin puede crear jueces y equipos desde el panel web.
+
+---
+
+## Deploy automático
+
+Cada `git push` a `main` dispara GitHub Actions que construye y despliega automáticamente.
+
+Para el primer deploy manual:
+```bash
+npm run build
+npx firebase deploy --only hosting
+```
+
+### Configuración requerida (una sola vez)
+
+1. Crear una Service Account en [Google Cloud IAM](https://console.cloud.google.com/iam-admin/serviceaccounts) con rol **Firebase Hosting Admin**
+2. Descargar el JSON de la key
+3. Agregar como secret en GitHub → **Settings → Secrets → Actions** con el nombre `FIREBASE_SERVICE_ACCOUNT`
+
+---
+
+## Estructura del proyecto
+
+```
+wro-judging/
+├── .github/workflows/
+│   └── deploy.yml              — CI/CD: build + Firebase deploy
+├── src/
+│   ├── App.jsx                 — Enrutador principal (admin/juez/login)
+│   ├── firebase.js             — Configuración Firebase ⚠️ editar
+│   ├── contexts/
+│   │   └── AuthContext.jsx     — Auth + perfil + createJudge
+│   └── components/
+│       ├── Login.jsx
+│       ├── admin/
+│       │   ├── AdminDashboard.jsx   — Layout + navegación
+│       │   ├── JudgeManagement.jsx  — CRUD jueces + buscador + filtros
+│       │   ├── TeamManagement.jsx   — CRUD equipos + buscador + filtros
+│       │   ├── ResultsView.jsx      — Puntajes por equipo/ronda + CSV
+│       │   └── RankingView.jsx      — Leaderboard en tiempo real
+│       └── judge/
+│           ├── JudgeDashboard.jsx   — Equipos asignados + buscador
+│           └── scoring/
+│               ├── ScoreSheet.jsx   — Hoja de puntuación interactiva
+│               └── scoringData.js   — Misiones y puntos (3 categorías)
+├── firestore.rules             — Reglas de seguridad Firestore
+├── firebase.json               — Configuración Firebase Hosting
+└── .firebaserc                 — Proyecto Firebase activo
+```
+
+---
+
+*WRO El Salvador 2026 · Game Changer Robotics*
