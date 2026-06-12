@@ -140,7 +140,7 @@ export default function Login() {
         </motion.div>
 
         <p className="text-center text-gray-600 text-xs mt-6">
-          Game Changer Robotics · WRO Mexico 2026
+          Game Changer Robotics · WRO 2026
         </p>
       </motion.div>
     </div>
