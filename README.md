@@ -146,7 +146,7 @@ wro-judging/
 │   └── deploy.yml              — CI/CD: build + Firebase deploy
 ├── src/
 │   ├── App.jsx                 — Enrutador principal (admin/juez/login)
-│   ├── firebase.js             — Configuración Firebase ⚠️ editar
+│   ├── firebase.js             — Configuración Firebase (editar)
 │   ├── contexts/
 │   │   └── AuthContext.jsx     — Auth + perfil + createJudge
 │   └── components/
