@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { collection, onSnapshot, query } from 'firebase/firestore'
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
-import { Trophy, Download, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trophy, Download, ChevronDown, ChevronUp, ShieldCheck, LockOpen, Loader2 } from 'lucide-react'
 
 const CATEGORIES = ['elementary', 'junior', 'senior']
 const ROUNDS = [1, 2, 3]
@@ -14,6 +14,18 @@ export default function ResultsView() {
   const [teams, setTeams] = useState([])
   const [activeCat, setActiveCat] = useState('elementary')
   const [expandedTeam, setExpandedTeam] = useState(null)
+  const [unlocking, setUnlocking] = useState(null) // docId being unlocked
+
+  const handleUnlock = async (e, scoreDocId) => {
+    e.stopPropagation()
+    if (!confirm('¿Permitir que el juez reenvíe este puntaje?')) return
+    setUnlocking(scoreDocId)
+    try {
+      await updateDoc(doc(db, 'scores', scoreDocId), { finalized: false })
+    } finally {
+      setUnlocking(null)
+    }
+  }
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'scores'), snap => {
@@ -181,15 +193,38 @@ export default function ResultsView() {
                           >
                             <div className="grid grid-cols-3 gap-3">
                               {ROUNDS.map(r => {
-                                const sc = scores.find(s => s.teamId === team.id && s.round === r)
+                                const sc      = scores.find(s => s.teamId === team.id && s.round === r)
+                                const isFinalized = sc?.finalized === true
+                                const docId   = sc?.id
                                 return (
                                   <div key={r} className={`rounded-xl border p-3 ${sc ? `border-${activeCat}/30 bg-${activeCat}/5` : 'border-dark-600 bg-dark-700'}`}>
-                                    <p className="text-xs text-gray-500 mb-2 font-medium">Ronda {r}</p>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-xs text-gray-500 font-medium">Ronda {r}</p>
+                                      {isFinalized && (
+                                        <div className="flex items-center gap-1">
+                                          <ShieldCheck size={11} className="text-green-400" />
+                                          <span className="text-xs text-green-400">Finalizado</span>
+                                        </div>
+                                      )}
+                                    </div>
                                     {sc ? (
                                       <>
                                         <p className={`font-mono font-extrabold text-xl text-${activeCat}`}>{sc.total} pts</p>
                                         {sc.seconds && <p className="text-xs text-gray-500 mt-1">⏱ {sc.seconds}s</p>}
                                         <p className="text-xs text-gray-600 mt-1">{new Date(sc.savedAt).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}</p>
+                                        {isFinalized && (
+                                          <button
+                                            onClick={e => handleUnlock(e, docId)}
+                                            disabled={unlocking === docId}
+                                            className="mt-2 flex items-center gap-1.5 text-xs text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                                          >
+                                            {unlocking === docId
+                                              ? <Loader2 size={11} className="animate-spin" />
+                                              : <LockOpen size={11} />
+                                            }
+                                            Permitir reenvío
+                                          </button>
+                                        )}
                                       </>
                                     ) : (
                                       <p className="text-sm text-gray-600">Sin puntaje</p>

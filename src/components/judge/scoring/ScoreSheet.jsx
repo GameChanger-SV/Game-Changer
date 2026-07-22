@@ -1,23 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Save, CheckCircle, ChevronUp, ChevronDown, RotateCcw, Clock, AlertCircle } from 'lucide-react'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { Save, CheckCircle, ChevronUp, ChevronDown, RotateCcw, Clock, Lock, WifiOff, RefreshCw, SendHorizonal, ShieldCheck } from 'lucide-react'
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../../../firebase'
 
 const CAT_COLORS = {
   elementary: { primary: '#F59E0B', class: 'elementary', ring: 'ring-elementary', border: 'border-elementary/30', bg: 'bg-elementary' },
-  junior: { primary: '#3B82F6', class: 'junior', ring: 'ring-junior', border: 'border-junior/30', bg: 'bg-junior' },
-  senior: { primary: '#8B5CF6', class: 'senior', ring: 'ring-senior', border: 'border-senior/30', bg: 'bg-senior' },
+  junior:     { primary: '#3B82F6', class: 'junior',     ring: 'ring-junior',     border: 'border-junior/30',     bg: 'bg-junior'     },
+  senior:     { primary: '#8B5CF6', class: 'senior',     ring: 'ring-senior',     border: 'border-senior/30',     bg: 'bg-senior'     },
 }
 
-function CounterInput({ value, onChange, min = 0, max, color }) {
+function CounterInput({ value, onChange, min = 0, max, color, disabled }) {
   return (
     <div className="flex items-center gap-1">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="w-7 h-7 rounded-lg bg-dark-600 hover:bg-dark-500 flex items-center justify-center text-gray-400 hover:text-white transition-all active:scale-90"
-        disabled={value <= min}
+        disabled={disabled || value <= min}
+        className="w-7 h-7 rounded-lg bg-dark-600 hover:bg-dark-500 flex items-center justify-center text-gray-400 hover:text-white transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <ChevronDown size={14} />
       </button>
@@ -27,8 +27,8 @@ function CounterInput({ value, onChange, min = 0, max, color }) {
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="w-7 h-7 rounded-lg bg-dark-600 hover:bg-dark-500 flex items-center justify-center text-gray-400 hover:text-white transition-all active:scale-90"
-        disabled={value >= max}
+        disabled={disabled || value >= max}
+        className="w-7 h-7 rounded-lg bg-dark-600 hover:bg-dark-500 flex items-center justify-center text-gray-400 hover:text-white transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <ChevronUp size={14} />
       </button>
@@ -36,12 +36,13 @@ function CounterInput({ value, onChange, min = 0, max, color }) {
   )
 }
 
-function ToggleInput({ value, onChange, color }) {
+function ToggleInput({ value, onChange, color, disabled }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(value ? 0 : 1)}
-      className={`w-10 h-6 rounded-full transition-all duration-300 relative ${
+      onClick={() => !disabled && onChange(value ? 0 : 1)}
+      disabled={disabled}
+      className={`w-10 h-6 rounded-full transition-all duration-300 relative disabled:opacity-40 disabled:cursor-not-allowed ${
         value ? `bg-${color}` : 'bg-dark-600'
       }`}
     >
@@ -52,107 +53,207 @@ function ToggleInput({ value, onChange, color }) {
   )
 }
 
-export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, readOnly = false }) {
+export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, readOnly = false, locked = false }) {
   const colorKey = CAT_COLORS[category]
   const docId = `${team.id}_round${round}`
-  const [scores, setScores] = useState({})
-  const [seconds, setSeconds] = useState('')
-  const [saved, setSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [scores, setScores]       = useState({})
+  const [seconds, setSeconds]     = useState('')
+  const [saved, setSaved]         = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [saveError, setSaveError] = useState(null)
+  const [showToast, setShowToast] = useState(false)
+  const [finalized, setFinalized] = useState(false)
+  const [finalizing, setFinalizing] = useState(false)
+
+  const isDisabled = readOnly || locked || finalized
 
   // Build bidirectional mutual map and max map from missions
   const { mutualMap, itemMaxMap } = useCallback(() => {
-    const mutualMap = {}
+    const mutualMap  = {}
     const itemMaxMap = {}
     missions.forEach(m => m.items.forEach(item => {
       itemMaxMap[item.id] = item.max
       if (item.mutualWith) {
-        mutualMap[item.id] = item.mutualWith
-        mutualMap[item.mutualWith] = item.id
+        mutualMap[item.id]          = item.mutualWith
+        mutualMap[item.mutualWith]  = item.id
       }
     }))
     return { mutualMap, itemMaxMap }
   }, [missions])()
 
-  // Change handler that enforces mutual exclusion / shared-max constraint
   const handleChange = useCallback((itemId, newValue) => {
+    if (isDisabled) return
     setScores(s => {
-      const next = { ...s, [itemId]: newValue }
+      const next      = { ...s, [itemId]: newValue }
       const partnerId = mutualMap[itemId]
       if (partnerId !== undefined && newValue > 0) {
-        const sharedMax = itemMaxMap[itemId]
-        next[partnerId] = Math.max(0, Math.min(s[partnerId] || 0, sharedMax - newValue))
+        const sharedMax   = itemMaxMap[itemId]
+        next[partnerId]   = Math.max(0, Math.min(s[partnerId] || 0, sharedMax - newValue))
       }
       return next
     })
     setSaved(false)
-  }, [mutualMap, itemMaxMap])
+    setSaveError(null)
+  }, [mutualMap, itemMaxMap, isDisabled])
 
-  // Initialize all items to 0
+  // Initialize and load existing scores
   useEffect(() => {
     const init = {}
     missions.forEach(m => m.items.forEach(item => { init[item.id] = 0 }))
     setScores(init)
     setSeconds('')
     setSaved(false)
+    setSaveError(null)
 
-    // Load existing scores
+    setFinalized(false)
     getDoc(doc(db, 'scores', docId)).then(snap => {
       if (snap.exists()) {
         const data = snap.data()
         setScores(data.scores || init)
         setSeconds(data.seconds || '')
         setSaved(true)
+        setFinalized(data.finalized === true)
       }
-    })
+    }).catch(() => {/* silent — will show error on save if needed */})
   }, [docId, team.id, round])
 
   const computeTotal = useCallback(() => {
     let total = 0
     missions.forEach(mission => {
       mission.items.forEach(item => {
-        const val = scores[item.id] || 0
-        total += val * item.perItem
+        total += (scores[item.id] || 0) * item.perItem
       })
     })
     return Math.min(total, maxScore)
   }, [scores, missions, maxScore])
 
   const handleSave = async () => {
+    if (isDisabled) return
     setSaving(true)
+    setSaveError(null)
     try {
       await setDoc(doc(db, 'scores', docId), {
-        teamId: team.id,
-        teamName: team.name,
+        teamId:    team.id,
+        teamName:  team.name,
         category,
         round,
         judgeUid,
         scores,
-        total: computeTotal(),
-        seconds: seconds || null,
-        savedAt: new Date().toISOString(),
+        total:     computeTotal(),
+        seconds:   seconds || null,
+        savedAt:   new Date().toISOString(),
       })
       setSaved(true)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    } catch (err) {
+      setSaveError('No se pudo guardar. Verifica tu conexión e intenta de nuevo.')
     } finally {
       setSaving(false)
     }
   }
 
+  const handleFinalize = async () => {
+    if (!saved) {
+      alert('Guarda los puntajes antes de finalizar.')
+      return
+    }
+    if (!confirm(`¿Finalizar Ronda ${round}? Ya no podrás modificar los puntajes a menos que el administrador lo permita.`)) return
+    setFinalizing(true)
+    try {
+      await updateDoc(doc(db, 'scores', docId), { finalized: true, finalizedAt: new Date().toISOString() })
+      setFinalized(true)
+    } catch {
+      alert('No se pudo finalizar. Intenta de nuevo.')
+    } finally {
+      setFinalizing(false)
+    }
+  }
+
   const handleReset = () => {
+    if (isDisabled) return
     if (!confirm('¿Reiniciar todos los puntajes de esta ronda?')) return
     const init = {}
     missions.forEach(m => m.items.forEach(item => { init[item.id] = 0 }))
     setScores(init)
     setSeconds('')
     setSaved(false)
+    setSaveError(null)
   }
 
   const total = computeTotal()
-  const pct = Math.round((total / maxScore) * 100)
+  const pct   = Math.round((total / maxScore) * 100)
 
   return (
     <div className="space-y-4">
-      {/* Score summary bar */}
+
+      {/* ── FINALIZED BANNER ── */}
+      {finalized && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/30"
+        >
+          <ShieldCheck size={16} className="text-green-400 shrink-0" />
+          <p className="text-green-300 text-sm font-medium">
+            Ronda {round} finalizada. Contacta al administrador si necesitas hacer cambios.
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── LOCK BANNER (admin round lock) ── */}
+      {locked && !finalized && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30"
+        >
+          <Lock size={16} className="text-yellow-400 shrink-0" />
+          <p className="text-yellow-300 text-sm font-medium">
+            Esta ronda ha sido cerrada por el administrador. No se pueden modificar los puntajes.
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── ERROR BANNER ── */}
+      <AnimatePresence>
+        {saveError && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30"
+          >
+            <WifiOff size={16} className="text-red-400 shrink-0" />
+            <p className="text-red-300 text-sm flex-1">{saveError}</p>
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-1.5 text-xs font-semibold text-red-300 hover:text-white bg-red-500/20 hover:bg-red-500/40 px-3 py-1.5 rounded-lg transition-all"
+            >
+              <RefreshCw size={12} /> Reintentar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── SUCCESS TOAST ── */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0,   scale: 1 }}
+            exit={{   opacity: 0, y: -12, scale: 0.95 }}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/15 border border-green-500/30"
+          >
+            <CheckCircle size={16} className="text-green-400 shrink-0" />
+            <p className="text-green-300 text-sm font-medium">
+              Puntaje guardado correctamente — Ronda {round}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── SCORE SUMMARY BAR ── */}
       <div className={`card border-${colorKey.class}/30 bg-gradient-to-r from-${colorKey.class}/10 to-transparent`}>
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -167,7 +268,6 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
             <p className="text-sm text-gray-500">rendimiento</p>
           </div>
         </div>
-        {/* Progress bar */}
         <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
           <motion.div
             className={`h-full ${colorKey.bg} rounded-full`}
@@ -178,7 +278,7 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
         </div>
       </div>
 
-      {/* Missions */}
+      {/* ── MISSIONS ── */}
       <div className="space-y-3">
         {missions.map((mission, mIdx) => (
           <motion.div
@@ -186,29 +286,30 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: mIdx * 0.06 }}
-            className="card"
+            className={`card ${isDisabled ? 'opacity-75' : ''}`}
           >
             <h3 className={`font-bold text-${colorKey.class} mb-1`}>{mission.title}</h3>
             <p className="text-xs text-gray-500 mb-4">{mission.description}</p>
 
             <div className="space-y-3">
               {mission.items.map(item => {
-                const val = scores[item.id] || 0
-                const pts = val * item.perItem
+                const val     = scores[item.id] || 0
+                const pts     = val * item.perItem
                 const isToggle = !item.count && item.max === 1
 
                 return (
                   <div key={item.id} className="flex items-center gap-3">
-                    {readOnly ? (
+                    {isDisabled ? (
                       <span className={`font-mono text-sm font-bold w-7 text-right ${val > 0 ? `text-${colorKey.class}` : 'text-gray-600'}`}>{val}</span>
                     ) : isToggle ? (
-                      <ToggleInput value={val} onChange={v => handleChange(item.id, v)} color={colorKey.class} />
+                      <ToggleInput value={val} onChange={v => handleChange(item.id, v)} color={colorKey.class} disabled={isDisabled} />
                     ) : (
                       <CounterInput
                         value={val}
                         onChange={v => handleChange(item.id, v)}
                         max={item.max}
                         color={colorKey.class}
+                        disabled={isDisabled}
                       />
                     )}
                     <div className="flex-1 min-w-0">
@@ -228,8 +329,7 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
               })}
             </div>
 
-            {/* Mission subtotal */}
-            <div className={`mt-3 pt-3 border-t border-dark-600 flex justify-between items-center`}>
+            <div className="mt-3 pt-3 border-t border-dark-600 flex justify-between items-center">
               <span className="text-xs text-gray-500">Subtotal misión</span>
               <span className={`font-mono font-bold text-sm text-${colorKey.class}`}>
                 {mission.items.reduce((s, item) => s + (scores[item.id] || 0) * item.perItem, 0)} pts
@@ -239,10 +339,10 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
         ))}
       </div>
 
-      {/* Time + Save */}
+      {/* ── TIME + SAVE ── */}
       {!readOnly && (
-        <div className="card flex items-center gap-4">
-          <div className="flex items-center gap-2 flex-1">
+        <div className={`card space-y-4 ${(locked || finalized) ? 'opacity-60 pointer-events-none' : ''}`}>
+          <div className="flex items-center gap-2">
             <Clock size={18} className="text-gray-500 shrink-0" />
             <div className="flex-1">
               <label className="block text-xs text-gray-500 mb-1">Tiempo (segundos)</label>
@@ -254,28 +354,50 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
                 onChange={e => { setSeconds(e.target.value); setSaved(false) }}
                 min={0}
                 max={180}
+                disabled={isDisabled}
               />
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleReset} className="btn-ghost px-3 py-2 flex items-center gap-1 text-sm">
+            <button
+              onClick={handleReset}
+              disabled={isDisabled}
+              className="btn-ghost px-3 py-2 flex items-center gap-1 text-sm disabled:opacity-40"
+            >
               <RotateCcw size={15} />
             </button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleSave}
-              disabled={saving}
-              className="btn-primary flex items-center gap-2 px-5 py-2 text-sm"
+              disabled={saving || isDisabled}
+              className="btn-ghost flex items-center gap-2 px-5 py-2 text-sm disabled:opacity-60 flex-1"
             >
               {saving ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : saved ? (
-                <><CheckCircle size={16} /> Guardado</>
+              ) : saved && !saveError ? (
+                <><CheckCircle size={16} className="text-green-400" /> Guardado</>
               ) : (
                 <><Save size={16} /> Guardar</>
               )}
             </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleFinalize}
+              disabled={finalizing || !saved || isDisabled}
+              className="btn-primary flex items-center gap-2 px-5 py-2 text-sm disabled:opacity-50"
+            >
+              {finalizing ? (
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <><SendHorizonal size={16} /> Finalizar</>
+              )}
+            </motion.button>
           </div>
+          {saved && !finalized && (
+            <p className="text-xs text-gray-500 text-center">
+              Puedes seguir editando hasta que presiones <span className="text-white font-medium">Finalizar</span>.
+            </p>
+          )}
         </div>
       )}
     </div>

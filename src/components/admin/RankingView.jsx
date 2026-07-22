@@ -6,7 +6,7 @@ import { Medal, Trophy } from 'lucide-react'
 
 const CATEGORIES = ['elementary', 'junior', 'senior']
 const CAT_LABEL = { elementary: 'Elementary', junior: 'Junior', senior: 'Senior' }
-const CAT_AGES = { elementary: '8–12 años', junior: '11–15 años', senior: '14–19 años' }
+const CAT_AGES = { elementary: '8–12 años', junior: '11–15 años', senior: '14–22 años' }
 const CAT_MAX = { elementary: 255, junior: 230, senior: 233 }
 
 function MedalIcon({ pos }) {

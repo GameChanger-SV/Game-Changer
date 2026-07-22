@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogOut, Trophy, Users, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink, Search, X } from 'lucide-react'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { LogOut, Trophy, Users, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink, Search, X, CheckCircle2, Lock, BarChart2 } from 'lucide-react'
+import { collection, getDocs, getDoc, query, where, onSnapshot, doc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import ScoreSheet from './scoring/ScoreSheet'
@@ -34,7 +34,7 @@ const CAT_CONFIG = {
   },
   senior: {
     missions: SENIOR_MISSIONS, max: SENIOR_MAX,
-    color: 'senior', label: 'Senior', ages: '14–19 años',
+    color: 'senior', label: 'Senior', ages: '14–22 años',
     theme: 'from-senior/20 to-transparent',
     rulesUrl: 'https://drive.google.com/file/d/1o_Xi_eLACKXUOCqZ5SzKwWG6TsFp7h2z/view',
     trackUrl: 'https://drive.google.com/file/d/1jANShezkNJAnseZCoUEjgEqlsG5Jh4dr/view',
@@ -249,6 +249,36 @@ export default function JudgeDashboard() {
 
 function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout }) {
   const [round, setRound] = useState(1)
+  const [lockedRounds, setLockedRounds] = useState([])
+  const [savedTotals, setSavedTotals] = useState({})   // { 1: 220, 2: 185, 3: 200 }
+  const [showSummary, setShowSummary] = useState(false)
+
+  // Live subscription to round lock state
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'competition'), snap => {
+      if (snap.exists()) setLockedRounds(snap.data().lockedRounds || [])
+    })
+    return unsub
+  }, [])
+
+  // Load saved totals for all 3 rounds (for summary and completion indicator)
+  useEffect(() => {
+    const fetchTotals = async () => {
+      const rounds = await Promise.all(
+        ROUNDS.map(r => getDoc(doc(db, 'scores', `${team.id}_round${r}`)))
+      )
+      const totals = {}
+      rounds.forEach((snap, i) => {
+        if (snap.exists()) totals[i + 1] = snap.data().total ?? null
+      })
+      setSavedTotals(totals)
+    }
+    fetchTotals()
+  }, [team.id])
+
+  const allSaved = ROUNDS.every(r => savedTotals[r] !== undefined)
+
+  const CAT_TEXT = { elementary: 'text-dark-900', junior: 'text-white', senior: 'text-white' }
 
   return (
     <div className="min-h-screen p-4 max-w-2xl mx-auto">
@@ -299,41 +329,117 @@ function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout })
         </div>
       </motion.div>
 
-      {/* Round tabs */}
+      {/* Round tabs + summary toggle */}
       <div className="flex gap-2 mb-5">
-        {ROUNDS.map(r => (
+        {ROUNDS.map(r => {
+          const isLocked  = lockedRounds.includes(r)
+          const hasSaved  = savedTotals[r] !== undefined
+          const isActive  = !showSummary && round === r
+          return (
+            <button
+              key={r}
+              onClick={() => { setRound(r); setShowSummary(false) }}
+              className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                isActive
+                  ? `bg-${config.color} ${CAT_TEXT[cat]} shadow-lg`
+                  : 'bg-dark-700 text-gray-400 hover:text-white border border-dark-500'
+              }`}
+            >
+              {isLocked && <Lock size={11} className={isActive ? 'opacity-70' : 'text-yellow-500'} />}
+              {hasSaved && !isLocked && <CheckCircle2 size={11} className={isActive ? 'opacity-70' : 'text-green-500'} />}
+              Ronda {r}
+            </button>
+          )
+        })}
+        {allSaved && (
           <button
-            key={r}
-            onClick={() => setRound(r)}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${
-              round === r
-                ? `bg-${config.color} text-${cat === 'elementary' ? 'dark-900' : 'white'} shadow-lg`
+            onClick={() => setShowSummary(true)}
+            className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 ${
+              showSummary
+                ? `bg-${config.color} ${CAT_TEXT[cat]} shadow-lg`
                 : 'bg-dark-700 text-gray-400 hover:text-white border border-dark-500'
             }`}
           >
-            Ronda {r}
+            <BarChart2 size={14} /> Resumen
           </button>
-        ))}
+        )}
       </div>
 
-      {/* Score sheet */}
+      {/* ── SUMMARY VIEW ── */}
       <AnimatePresence mode="wait">
-        <motion.div
-          key={round}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.2 }}
-        >
-          <ScoreSheet
-            team={team}
-            category={cat}
-            round={round}
-            missions={config.missions}
-            maxScore={config.max}
-            judgeUid={judgeUid}
-          />
-        </motion.div>
+        {showSummary ? (
+          <motion.div
+            key="summary"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.22 }}
+            className="space-y-4"
+          >
+            <div className="card">
+              <h3 className={`font-bold text-${config.color} mb-4 flex items-center gap-2`}>
+                <BarChart2 size={18} /> Resumen de puntuación – {team.name}
+              </h3>
+              <div className="space-y-3">
+                {ROUNDS.map(r => {
+                  const total = savedTotals[r] ?? 0
+                  const pct   = Math.round((total / config.max) * 100)
+                  const isLocked = lockedRounds.includes(r)
+                  return (
+                    <div key={r}>
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-white">Ronda {r}</span>
+                          {isLocked && <Lock size={12} className="text-yellow-500" />}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono font-bold text-${config.color}`}>{total}</span>
+                          <span className="text-gray-500 text-xs">/ {config.max}</span>
+                          <span className="text-gray-400 text-xs w-10 text-right">{pct}%</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-dark-600 rounded-full overflow-hidden">
+                        <motion.div
+                          className={`h-full bg-${config.color} rounded-full`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.5, delay: r * 0.1 }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className={`mt-5 pt-4 border-t border-dark-600 flex justify-between items-center`}>
+                <span className="text-gray-400 font-medium">Mejor ronda</span>
+                <span className={`font-mono font-extrabold text-2xl text-${config.color}`}>
+                  {Math.max(...ROUNDS.map(r => savedTotals[r] ?? 0))}
+                  <span className="text-sm text-gray-500 font-normal ml-1">pts</span>
+                </span>
+              </div>
+            </div>
+            <p className="text-center text-xs text-gray-600">Las 3 rondas han sido registradas correctamente.</p>
+          </motion.div>
+        ) : (
+          /* ── SCORE SHEET ── */
+          <motion.div
+            key={round}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ScoreSheet
+              team={team}
+              category={cat}
+              round={round}
+              missions={config.missions}
+              maxScore={config.max}
+              judgeUid={judgeUid}
+              locked={lockedRounds.includes(round)}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   )
