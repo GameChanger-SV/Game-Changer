@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogOut, Trophy, Users, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink, Search, X, CheckCircle2, Lock, BarChart2 } from 'lucide-react'
-import { collection, getDocs, getDoc, query, where, onSnapshot, doc } from 'firebase/firestore'
+import { LogOut, Trophy, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink, Search, X, CheckCircle2, BarChart2 } from 'lucide-react'
+import { collection, getDocs, getDoc, query, where, doc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import ScoreSheet from './scoring/ScoreSheet'
@@ -249,17 +249,8 @@ export default function JudgeDashboard() {
 
 function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout }) {
   const [round, setRound] = useState(1)
-  const [lockedRounds, setLockedRounds] = useState([])
   const [savedTotals, setSavedTotals] = useState({})   // { 1: 220, 2: 185, 3: 200 }
   const [showSummary, setShowSummary] = useState(false)
-
-  // Live subscription to round lock state
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'competition'), snap => {
-      if (snap.exists()) setLockedRounds(snap.data().lockedRounds || [])
-    })
-    return unsub
-  }, [])
 
   // Load saved totals for all 3 rounds (for summary and completion indicator)
   useEffect(() => {
@@ -332,9 +323,8 @@ function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout })
       {/* Round tabs + summary toggle */}
       <div className="flex gap-2 mb-5">
         {ROUNDS.map(r => {
-          const isLocked  = lockedRounds.includes(r)
-          const hasSaved  = savedTotals[r] !== undefined
-          const isActive  = !showSummary && round === r
+          const hasSaved = savedTotals[r] !== undefined
+          const isActive = !showSummary && round === r
           return (
             <button
               key={r}
@@ -345,8 +335,7 @@ function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout })
                   : 'bg-dark-700 text-gray-400 hover:text-white border border-dark-500'
               }`}
             >
-              {isLocked && <Lock size={11} className={isActive ? 'opacity-70' : 'text-yellow-500'} />}
-              {hasSaved && !isLocked && <CheckCircle2 size={11} className={isActive ? 'opacity-70' : 'text-green-500'} />}
+              {hasSaved && <CheckCircle2 size={11} className={isActive ? 'opacity-70' : 'text-green-500'} />}
               Ronda {r}
             </button>
           )
@@ -384,13 +373,11 @@ function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout })
                 {ROUNDS.map(r => {
                   const total = savedTotals[r] ?? 0
                   const pct   = Math.round((total / config.max) * 100)
-                  const isLocked = lockedRounds.includes(r)
                   return (
                     <div key={r}>
                       <div className="flex justify-between items-center mb-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-white">Ronda {r}</span>
-                          {isLocked && <Lock size={12} className="text-yellow-500" />}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`font-mono font-bold text-${config.color}`}>{total}</span>
@@ -436,7 +423,7 @@ function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout })
               missions={config.missions}
               maxScore={config.max}
               judgeUid={judgeUid}
-              locked={lockedRounds.includes(round)}
+
             />
           </motion.div>
         )}

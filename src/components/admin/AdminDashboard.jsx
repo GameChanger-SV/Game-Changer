@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Trophy, LogOut, ChevronRight, LayoutDashboard, UserPlus, Flag, BarChart2, Medal, Lock, Unlock, Loader2 } from 'lucide-react'
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'
-import { db } from '../../firebase'
+import { Users, Trophy, LogOut, ChevronRight, LayoutDashboard, UserPlus, Flag, BarChart2, Medal } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import JudgeManagement from './JudgeManagement'
 import TeamManagement from './TeamManagement'
@@ -89,75 +87,6 @@ export default function AdminDashboard() {
   )
 }
 
-function RoundLockControls() {
-  const [lockedRounds, setLockedRounds] = useState([])
-  const [toggling, setToggling]         = useState(null)  // round number being toggled
-
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'competition'), snap => {
-      setLockedRounds(snap.exists() ? (snap.data().lockedRounds || []) : [])
-    })
-    return unsub
-  }, [])
-
-  const toggle = async (round) => {
-    setToggling(round)
-    try {
-      const next = lockedRounds.includes(round)
-        ? lockedRounds.filter(r => r !== round)
-        : [...lockedRounds, round]
-      await setDoc(doc(db, 'settings', 'competition'), { lockedRounds: next }, { merge: true })
-    } finally {
-      setToggling(null)
-    }
-  }
-
-  return (
-    <div className="card mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="font-bold text-white">Control de Rondas</h2>
-          <p className="text-sm text-gray-400">Bloquear una ronda impide que los jueces modifiquen puntajes.</p>
-        </div>
-        <Lock size={18} className="text-gray-500" />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {[1, 2, 3].map(r => {
-          const isLocked = lockedRounds.includes(r)
-          const isToggling = toggling === r
-          return (
-            <motion.button
-              key={r}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => toggle(r)}
-              disabled={isToggling}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all font-medium text-sm disabled:opacity-60 ${
-                isLocked
-                  ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/25'
-                  : 'bg-dark-700 border-dark-500 text-gray-300 hover:bg-dark-600 hover:text-white'
-              }`}
-            >
-              {isToggling ? (
-                <Loader2 size={16} className="animate-spin shrink-0" />
-              ) : isLocked ? (
-                <Lock size={16} className="text-yellow-400 shrink-0" />
-              ) : (
-                <Unlock size={16} className="text-gray-500 shrink-0" />
-              )}
-              <div className="text-left">
-                <p className="font-semibold">Ronda {r}</p>
-                <p className={`text-xs ${isLocked ? 'text-yellow-500' : 'text-gray-500'}`}>
-                  {isLocked ? 'Bloqueada' : 'Abierta'}
-                </p>
-              </div>
-            </motion.button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function OverviewTab({ setTab }) {
   return (
     <motion.div
@@ -170,9 +99,6 @@ function OverviewTab({ setTab }) {
         <h1 className="text-3xl font-extrabold text-white">Panel de Administración</h1>
         <p className="text-gray-400 mt-1">WRO RoboMission 2026 – Game Changer Robotics</p>
       </div>
-
-      {/* Round lock controls */}
-      <RoundLockControls />
 
       {/* Category cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">

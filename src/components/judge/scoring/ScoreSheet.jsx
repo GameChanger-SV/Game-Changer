@@ -201,19 +201,6 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
         </motion.div>
       )}
 
-      {/* ── LOCK BANNER (admin round lock) ── */}
-      {locked && !finalized && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30"
-        >
-          <Lock size={16} className="text-yellow-400 shrink-0" />
-          <p className="text-yellow-300 text-sm font-medium">
-            Esta ronda ha sido cerrada por el administrador. No se pueden modificar los puntajes.
-          </p>
-        </motion.div>
-      )}
 
       {/* ── ERROR BANNER ── */}
       <AnimatePresence>
