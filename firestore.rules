@@ -33,8 +33,19 @@ service cloud.firestore {
     // Puntajes
     match /scores/{scoreId} {
       allow read: if request.auth != null;
-      // El juez solo puede escribir puntajes de sus equipos asignados
       allow write: if isJudge() || isAdmin();
+    }
+
+    // Instituciones
+    match /institutions/{instId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Configuración de competencia (round locks, etc.)
+    match /settings/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }

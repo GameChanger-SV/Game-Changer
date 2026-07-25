@@ -7,23 +7,22 @@ import JudgeDashboard from './components/judge/JudgeDashboard'
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-dark-500 border-t-brand-orange rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Cargando...</p>
-        </div>
+  const spinner = (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-dark-500 border-t-brand-orange rounded-full animate-spin" />
+        <p className="text-gray-400 text-sm">Cargando...</p>
       </div>
-    )
-  }
+    </div>
+  )
 
+  if (loading) return spinner
   if (!user) return <Login />
+  if (!profile) return spinner  // usuario autenticado pero perfil aún cargando
 
-  if (profile?.role === 'admin') return <AdminDashboard />
-  if (profile?.role === 'judge') return <JudgeDashboard />
+  if (profile.role === 'admin') return <AdminDashboard />
+  if (profile.role === 'judge') return <JudgeDashboard />
 
-  // Sin perfil asignado
   return (
     <div className="min-h-screen flex items-center justify-center text-gray-400">
       Cuenta sin rol asignado. Contacta al administrador.
