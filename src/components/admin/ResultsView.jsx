@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore'
+import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
-import { Trophy, Download, ChevronDown, ChevronUp, ShieldCheck, LockOpen, Loader2 } from 'lucide-react'
+import { Trophy, Download, ChevronDown, ChevronUp, ShieldCheck, LockOpen, Loader2, Trash2 } from 'lucide-react'
 
 const CATEGORIES = ['elementary', 'junior', 'senior']
 const ROUNDS = [1, 2, 3]
@@ -14,7 +14,8 @@ export default function ResultsView() {
   const [teams, setTeams] = useState([])
   const [activeCat, setActiveCat] = useState('elementary')
   const [expandedTeam, setExpandedTeam] = useState(null)
-  const [unlocking, setUnlocking] = useState(null) // docId being unlocked
+  const [unlocking, setUnlocking] = useState(null)
+  const [resetting, setResetting]  = useState(null)
 
   const handleUnlock = async (e, scoreDocId) => {
     e.stopPropagation()
@@ -24,6 +25,17 @@ export default function ResultsView() {
       await updateDoc(doc(db, 'scores', scoreDocId), { finalized: false })
     } finally {
       setUnlocking(null)
+    }
+  }
+
+  const handleReset = async (e, scoreDocId, teamName, round) => {
+    e.stopPropagation()
+    if (!confirm(`¿Restablecer Ronda ${round} de "${teamName}"? Esto borrará el puntaje permanentemente.`)) return
+    setResetting(scoreDocId)
+    try {
+      await deleteDoc(doc(db, 'scores', scoreDocId))
+    } finally {
+      setResetting(null)
     }
   }
 
@@ -212,19 +224,26 @@ export default function ResultsView() {
                                         <p className={`font-mono font-extrabold text-xl text-${activeCat}`}>{sc.total} pts</p>
                                         {sc.seconds && <p className="text-xs text-gray-500 mt-1">⏱ {sc.seconds}s</p>}
                                         <p className="text-xs text-gray-600 mt-1">{new Date(sc.savedAt).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}</p>
-                                        {isFinalized && (
+                                        <div className="mt-2 flex gap-1.5 flex-wrap">
+                                          {isFinalized && (
+                                            <button
+                                              onClick={e => handleUnlock(e, docId)}
+                                              disabled={unlocking === docId}
+                                              className="flex items-center gap-1.5 text-xs text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                                            >
+                                              {unlocking === docId ? <Loader2 size={11} className="animate-spin" /> : <LockOpen size={11} />}
+                                              Permitir reenvío
+                                            </button>
+                                          )}
                                           <button
-                                            onClick={e => handleUnlock(e, docId)}
-                                            disabled={unlocking === docId}
-                                            className="mt-2 flex items-center gap-1.5 text-xs text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                                            onClick={e => handleReset(e, docId, team.name, r)}
+                                            disabled={resetting === docId}
+                                            className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded-lg transition-all disabled:opacity-50"
                                           >
-                                            {unlocking === docId
-                                              ? <Loader2 size={11} className="animate-spin" />
-                                              : <LockOpen size={11} />
-                                            }
-                                            Permitir reenvío
+                                            {resetting === docId ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                                            Restablecer
                                           </button>
-                                        )}
+                                        </div>
                                       </>
                                     ) : (
                                       <p className="text-sm text-gray-600">Sin puntaje</p>

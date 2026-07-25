@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PlusCircle, Trash2, X, CheckCircle, AlertCircle, Trophy, UserCheck, ChevronDown, Pencil, Search, SlidersHorizontal } from 'lucide-react'
-import { collection, addDoc, getDocs, deleteDoc, doc, query, where, updateDoc } from 'firebase/firestore'
+import { PlusCircle, Trash2, X, CheckCircle, AlertCircle, Trophy, UserCheck, ChevronDown, Pencil, Search, SlidersHorizontal, Building2 } from 'lucide-react'
+import { collection, addDoc, getDocs, deleteDoc, doc, query, where, updateDoc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase'
 
 const CATEGORIES = ['elementary', 'junior', 'senior']
@@ -9,6 +9,7 @@ const CATEGORIES = ['elementary', 'junior', 'senior']
 export default function TeamManagement() {
   const [teams, setTeams] = useState([])
   const [judges, setJudges] = useState([])
+  const [institutions, setInstitutions] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -53,6 +54,15 @@ export default function TeamManagement() {
   }
 
   useEffect(() => { fetchData() }, [])
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'institutions'), snap => {
+      setInstitutions(
+        snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name))
+      )
+    })
+    return unsub
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -383,9 +393,25 @@ export default function TeamManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Institución / Escuela</label>
-                  <input className="input-field" placeholder="Nombre de la escuela" value={form.school}
-                    onChange={e => setForm(f => ({ ...f, school: e.target.value }))} />
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium flex items-center gap-1.5">
+                    <Building2 size={14} /> Institución
+                  </label>
+                  <select
+                    className="input-field"
+                    value={form.school}
+                    onChange={e => {
+                      const inst = institutions.find(i => i.name === e.target.value)
+                      setForm(f => ({ ...f, school: e.target.value, city: inst?.city || f.city }))
+                    }}
+                  >
+                    <option value="">— Seleccionar institución —</option>
+                    {institutions.map(i => (
+                      <option key={i.id} value={i.name}>{i.name}{i.city ? ` (${i.city})` : ''}</option>
+                    ))}
+                  </select>
+                  {institutions.length === 0 && (
+                    <p className="text-xs text-yellow-500 mt-1">No hay instituciones registradas. Agrégalas en la tab "Instituciones" primero.</p>
+                  )}
                 </div>
 
                 <div>
