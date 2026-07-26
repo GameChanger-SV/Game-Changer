@@ -92,7 +92,7 @@ export default function AdminDashboard() {
   )
 }
 
-function useBestTeams() {
+function useTopTeams() {
   const [teams, setTeams]   = useState([])
   const [scores, setScores] = useState([])
 
@@ -102,24 +102,26 @@ function useBestTeams() {
     return () => { u1(); u2() }
   }, [])
 
-  const best = {}
+  const top = {}
   for (const cat of ['elementary', 'junior', 'senior']) {
     const catTeams = teams.filter(t => t.category === cat)
-    let top = null
-    for (const team of catTeams) {
-      const teamScores = scores.filter(s => s.teamId === team.id)
-      const bestScore  = teamScores.length ? Math.max(...teamScores.map(s => s.total ?? 0)) : null
-      if (bestScore !== null && (top === null || bestScore > top.score)) {
-        top = { team, score: bestScore }
-      }
-    }
-    best[cat] = top
+    const ranked = catTeams
+      .map(team => {
+        const teamScores = scores.filter(s => s.teamId === team.id)
+        const sum  = teamScores.length ? teamScores.reduce((acc, s) => acc + (s.total ?? 0), 0) : null
+        const best = teamScores.length ? Math.max(...teamScores.map(s => s.total ?? 0)) : null
+        return { team, sum, best }
+      })
+      .filter(r => r.sum !== null)
+      .sort((a, b) => b.sum - a.sum)
+      .slice(0, 3)
+    top[cat] = ranked
   }
-  return best
+  return top
 }
 
 function OverviewTab({ setTab }) {
-  const bestTeams = useBestTeams()
+  const topTeams = useTopTeams()
 
   return (
     <motion.div
@@ -133,14 +135,15 @@ function OverviewTab({ setTab }) {
         <p className="text-gray-400 mt-1">WRO RoboMission 2026 – Game Changer Robotics</p>
       </div>
 
-      {/* Best team per category */}
+      {/* Top 3 per category */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
           { cat: 'elementary', label: 'Elementary', color: 'elementary' },
           { cat: 'junior',     label: 'Junior',     color: 'junior'     },
           { cat: 'senior',     label: 'Senior',     color: 'senior'     },
         ].map(({ cat, label, color }) => {
-          const top = bestTeams[cat]
+          const top3 = topTeams[cat] || []
+          const medals = ['🥇', '🥈', '🥉']
           return (
             <motion.div
               key={cat}
@@ -148,25 +151,33 @@ function OverviewTab({ setTab }) {
               animate={{ opacity: 1, y: 0 }}
               className={`card border-${color}/30 bg-gradient-to-br from-${color}/10 to-transparent`}
             >
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-4">
                 <Star size={14} className={`text-${color}`} />
                 <span className={`badge-${color} text-xs`}>{label}</span>
               </div>
-              {top ? (
-                <>
-                  <p className="font-extrabold text-white text-lg leading-tight truncate">{top.team.name}</p>
-                  <p className={`font-mono font-bold text-3xl text-${color} mt-1`}>
-                    {top.score} <span className="text-sm text-gray-500 font-normal">pts</span>
-                  </p>
-                  {top.team.school && (
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <Building2 size={12} className="text-gray-500 shrink-0" />
-                      <p className="text-xs text-gray-400 truncate">{top.team.school}</p>
-                    </div>
-                  )}
-                </>
+              {top3.length === 0 ? (
+                <p className="text-gray-600 text-sm">Sin puntajes aún</p>
               ) : (
-                <p className="text-gray-600 text-sm mt-1">Sin puntajes aún</p>
+                <div className="space-y-3">
+                  {top3.map(({ team, sum, best }, i) => (
+                    <div key={team.id} className={`flex items-center gap-2 ${i === 0 ? '' : 'opacity-75'}`}>
+                      <span className="text-base shrink-0">{medals[i]}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-bold text-sm truncate ${i === 0 ? 'text-white' : 'text-gray-300'}`}>{team.name}</p>
+                        {team.school && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Building2 size={10} className="text-gray-600 shrink-0" />
+                            <p className="text-xs text-gray-500 truncate">{team.school}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`font-mono font-bold text-sm text-${color}`}>{sum}</p>
+                        <p className="text-xs text-gray-600">mejor: {best}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </motion.div>
           )

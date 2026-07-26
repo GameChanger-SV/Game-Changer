@@ -23,14 +23,15 @@ function CategoryRanking({ cat, teams, scores }) {
   const ranked = catTeams.map(team => {
     const teamScores = scores.filter(s => s.teamId === team.id)
     const best = teamScores.length > 0 ? Math.max(...teamScores.map(s => s.total)) : null
+    const total = teamScores.length > 0 ? teamScores.reduce((s, sc) => s + (sc.total ?? 0), 0) : null
     const roundMap = {}
     teamScores.forEach(s => { roundMap[s.round] = s.total })
-    return { team, best, roundMap, scoredRounds: teamScores.length }
+    return { team, best, total, roundMap, scoredRounds: teamScores.length }
   }).sort((a, b) => {
-    if (a.best === null && b.best === null) return 0
-    if (a.best === null) return 1
-    if (b.best === null) return -1
-    return b.best - a.best
+    if (a.total === null && b.total === null) return 0
+    if (a.total === null) return 1
+    if (b.total === null) return -1
+    return b.total - a.total
   })
 
   const scoredTeams = ranked.filter(r => r.best !== null)
@@ -55,8 +56,9 @@ function CategoryRanking({ cat, teams, scores }) {
       ) : (
         <div className="space-y-2">
           {/* Scored teams */}
-          {scoredTeams.map(({ team, best, roundMap, scoredRounds }, idx) => {
-            const pct = Math.round((best / max) * 100)
+          {scoredTeams.map(({ team, best, total, roundMap, scoredRounds }, idx) => {
+            const maxTotal = max * 3
+            const pct = Math.round((total / maxTotal) * 100)
             const pos = idx + 1
             return (
               <motion.div
@@ -106,10 +108,11 @@ function CategoryRanking({ cat, teams, scores }) {
                   ))}
                 </div>
 
-                {/* Best score */}
-                <div className="text-right shrink-0 min-w-[72px]">
-                  <p className={`font-mono font-extrabold text-xl text-${cat}`}>{best}</p>
-                  <p className="text-xs text-gray-500">{pct}% · {scoredRounds} rdas</p>
+                {/* Scores */}
+                <div className="text-right shrink-0 min-w-[90px]">
+                  <p className={`font-mono font-extrabold text-xl text-${cat}`}>{total}</p>
+                  <p className="text-xs text-gray-500">suma · {pct}%</p>
+                  <p className="text-xs text-gray-600 mt-0.5">mejor: <span className={`text-${cat} font-semibold`}>{best}</span></p>
                 </div>
               </motion.div>
             )
@@ -164,7 +167,7 @@ export default function RankingView() {
     >
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-white">Ranking</h1>
-        <p className="text-gray-400 mt-1">Clasificación por mejor puntaje de 3 rondas · Actualización en tiempo real</p>
+        <p className="text-gray-400 mt-1">Clasificación por suma de 3 rondas · Actualización en tiempo real</p>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
@@ -186,7 +189,7 @@ export default function RankingView() {
       <div className="flex items-center gap-2 mb-6 text-xs text-gray-500">
         <div className="w-3 h-3 rounded bg-dark-400" /> Ronda sin puntaje
         <div className="w-3 h-3 rounded bg-dark-600 ml-2" /> Puntaje registrado
-        <div className="w-3 h-3 rounded bg-elementary ml-2 opacity-60" /> Mejor ronda
+        <div className="w-3 h-3 rounded bg-elementary ml-2 opacity-60" /> Mejor ronda (resaltada)
       </div>
 
       {CATEGORIES.map(cat => (
