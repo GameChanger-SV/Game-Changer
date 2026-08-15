@@ -53,7 +53,7 @@ function ToggleInput({ value, onChange, color, disabled }) {
   )
 }
 
-export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, readOnly = false, locked = false }) {
+export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, judgeName = null, eventId = null, readOnly = false, locked = false }) {
   const colorKey = CAT_COLORS[category]
   const docId = `${team.id}_round${round}`
   const [scores, setScores]       = useState({})
@@ -138,10 +138,12 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
         category,
         round,
         judgeUid,
+        ...(judgeName ? { judgeName } : {}),
         scores,
         total:     computeTotal(),
         seconds:   seconds || null,
         savedAt:   new Date().toISOString(),
+        ...(eventId ? { eventId } : {}),
       })
       setSaved(true)
       setShowToast(true)

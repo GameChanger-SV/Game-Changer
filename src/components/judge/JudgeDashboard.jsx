@@ -4,7 +4,9 @@ import { LogOut, Trophy, ChevronRight, Bot, ArrowLeft, BookOpen, ExternalLink, S
 import { collection, getDocs, getDoc, query, where, doc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
+import { useActiveEvent } from '../../hooks/useActiveEvent'
 import ScoreSheet from './scoring/ScoreSheet'
+import RSJudgeView from './rs/RSJudgeView'
 import {
   ELEMENTARY_MISSIONS, ELEMENTARY_MAX,
   JUNIOR_MISSIONS, JUNIOR_MAX,
@@ -48,12 +50,19 @@ const ROUNDS = [1, 2, 3]
 
 export default function JudgeDashboard() {
   const { user, profile, logout } = useAuth()
+  const activeEvent = useActiveEvent()
   const [teams, setTeams] = useState([])
   const [selected, setSelected] = useState(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const [search, setSearch] = useState('')
 
   const cat = profile?.category
+
+  // RS judges get the RoboStarter scoring interface
+  if (cat === 'rs_elementary' || cat === 'rs_junior') {
+    return <RSJudgeView category={cat.replace('rs_', '')} eventId={activeEvent?.id ?? null} />
+  }
+
   const config = CAT_CONFIG[cat] || CAT_CONFIG.elementary
 
   const filteredTeams = search
@@ -84,6 +93,7 @@ export default function JudgeDashboard() {
         cat={cat}
         judgeUid={user.uid}
         profile={profile}
+        eventId={activeEvent?.id ?? null}
         onBack={() => setSelected(null)}
         onLogout={logout}
       />
@@ -247,7 +257,7 @@ export default function JudgeDashboard() {
   )
 }
 
-function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout }) {
+function TeamScoring({ team, config, cat, judgeUid, profile, eventId, onBack, onLogout }) {
   const [round, setRound] = useState(1)
   const [savedTotals, setSavedTotals] = useState({})   // { 1: 220, 2: 185, 3: 200 }
   const [showSummary, setShowSummary] = useState(false)
@@ -432,7 +442,8 @@ function TeamScoring({ team, config, cat, judgeUid, profile, onBack, onLogout })
               missions={config.missions}
               maxScore={config.max}
               judgeUid={judgeUid}
-
+              judgeName={profile?.name || null}
+              eventId={eventId}
             />
           </motion.div>
         )}

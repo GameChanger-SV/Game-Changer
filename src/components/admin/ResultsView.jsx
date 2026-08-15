@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
-import { Trophy, Download, ChevronDown, ChevronUp, ShieldCheck, LockOpen, Loader2, Trash2 } from 'lucide-react'
+import { Trophy, Download, ChevronDown, ChevronUp, ShieldCheck, LockOpen, Loader2, Trash2, Calendar } from 'lucide-react'
 
 const CATEGORIES = ['elementary', 'junior', 'senior']
 const ROUNDS = [1, 2, 3]
@@ -10,8 +10,10 @@ const ROUNDS = [1, 2, 3]
 const CAT_LABEL = { elementary: 'Elementary', junior: 'Junior', senior: 'Senior' }
 
 export default function ResultsView() {
-  const [scores, setScores] = useState([])
-  const [teams, setTeams] = useState([])
+  const [scores, setScores]       = useState([])
+  const [teams, setTeams]         = useState([])
+  const [events, setEvents]       = useState([])
+  const [selectedEventId, setSelectedEventId] = useState('all')
   const [activeCat, setActiveCat] = useState('elementary')
   const [expandedTeam, setExpandedTeam] = useState(null)
   const [unlocking, setUnlocking] = useState(null)
@@ -40,14 +42,27 @@ export default function ResultsView() {
   }
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'scores'), snap => {
+    const u1 = onSnapshot(collection(db, 'scores'), snap =>
       setScores(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    })
-    const unsubTeams = onSnapshot(collection(db, 'teams'), snap => {
+    )
+    const u2 = onSnapshot(collection(db, 'teams'), snap =>
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    )
+    const u3 = onSnapshot(collection(db, 'events'), snap => {
+      const evs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      setEvents(evs)
+      // Auto-select active event on first load
+      const active = evs.find(e => e.active)
+      if (active) setSelectedEventId(prev => prev === 'all' ? active.id : prev)
     })
-    return () => { unsub(); unsubTeams() }
+    return () => { u1(); u2(); u3() }
   }, [])
+
+  // Filter scores by selected event
+  const filteredScores = selectedEventId === 'all'
+    ? scores
+    : scores.filter(s => s.eventId === selectedEventId)
 
   // Filter teams by category
   const catTeams = teams.filter(t => t.category === activeCat)
@@ -55,7 +70,7 @@ export default function ResultsView() {
   // Build team-score matrix
   const teamRows = catTeams.map(team => {
     const roundScores = ROUNDS.map(r => {
-      const s = scores.find(sc => sc.teamId === team.id && sc.round === r)
+      const s = filteredScores.find(sc => sc.teamId === team.id && sc.round === r)
       return s ? s.total : null
     })
     const validScores = roundScores.filter(s => s !== null)
@@ -100,15 +115,34 @@ export default function ResultsView() {
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-white">Resultados</h1>
+          <h1 className="text-3xl font-extrabold text-white">Resultados RM</h1>
           <p className="text-gray-400 mt-1">Puntajes por equipo y ronda</p>
         </div>
         <button onClick={handleExport} className="btn-ghost flex items-center gap-2 text-sm">
           <Download size={16} /> Exportar CSV
         </button>
       </div>
+
+      {/* Event selector */}
+      {events.length > 0 && (
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <Calendar size={14} className="text-gray-500 shrink-0" />
+          <span className="text-xs text-gray-500">Evento:</span>
+          {[{ id: 'all', name: 'Todos', date: '' }, ...events].map(ev => (
+            <button key={ev.id} onClick={() => setSelectedEventId(ev.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                selectedEventId === ev.id
+                  ? ev.active ? 'bg-brand-orange/20 border-brand-orange text-brand-orange' : 'bg-dark-600 border-dark-400 text-white'
+                  : 'border-dark-500 text-gray-400 hover:text-white hover:border-dark-400'
+              }`}>
+              {ev.name}
+              {ev.active && <span className="ml-1 text-brand-orange">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Category tabs */}
       <div className="flex gap-2 mb-6">
@@ -205,7 +239,7 @@ export default function ResultsView() {
                           >
                             <div className="grid grid-cols-3 gap-3">
                               {ROUNDS.map(r => {
-                                const sc      = scores.find(s => s.teamId === team.id && s.round === r)
+                                const sc      = filteredScores.find(s => s.teamId === team.id && s.round === r)
                                 const isFinalized = sc?.finalized === true
                                 const docId   = sc?.id
                                 return (

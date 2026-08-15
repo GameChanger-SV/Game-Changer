@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase'
-import { Medal, Trophy } from 'lucide-react'
+import { Medal, Trophy, Calendar } from 'lucide-react'
 
 const CATEGORIES = ['elementary', 'junior', 'senior']
 const CAT_LABEL = { elementary: 'Elementary', junior: 'Junior', senior: 'Senior' }
@@ -146,17 +146,30 @@ function CategoryRanking({ cat, teams, scores }) {
 
 export default function RankingView() {
   const [scores, setScores] = useState([])
-  const [teams, setTeams] = useState([])
+  const [teams, setTeams]   = useState([])
+  const [events, setEvents] = useState([])
+  const [selectedEventId, setSelectedEventId] = useState('all')
 
   useEffect(() => {
-    const unsub1 = onSnapshot(collection(db, 'scores'), snap => {
+    const u1 = onSnapshot(collection(db, 'scores'), snap =>
       setScores(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    })
-    const unsub2 = onSnapshot(collection(db, 'teams'), snap => {
+    )
+    const u2 = onSnapshot(collection(db, 'teams'), snap =>
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    )
+    const u3 = onSnapshot(collection(db, 'events'), snap => {
+      const evs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      setEvents(evs)
+      const active = evs.find(e => e.active)
+      if (active) setSelectedEventId(prev => prev === 'all' ? active.id : prev)
     })
-    return () => { unsub1(); unsub2() }
+    return () => { u1(); u2(); u3() }
   }, [])
+
+  const filteredScores = selectedEventId === 'all'
+    ? scores
+    : scores.filter(s => s.eventId === selectedEventId)
 
   return (
     <motion.div
@@ -165,15 +178,34 @@ export default function RankingView() {
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-white">Ranking</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-white">Ranking RM</h1>
         <p className="text-gray-400 mt-1">Clasificación por suma de 3 rondas · Actualización en tiempo real</p>
       </div>
+
+      {/* Event selector */}
+      {events.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <Calendar size={14} className="text-gray-500 shrink-0" />
+          <span className="text-xs text-gray-500">Evento:</span>
+          {[{ id: 'all', name: 'Todos', date: '' }, ...events].map(ev => (
+            <button key={ev.id} onClick={() => setSelectedEventId(ev.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                selectedEventId === ev.id
+                  ? ev.active ? 'bg-brand-orange/20 border-brand-orange text-brand-orange' : 'bg-dark-600 border-dark-400 text-white'
+                  : 'border-dark-500 text-gray-400 hover:text-white hover:border-dark-400'
+              }`}>
+              {ev.name}
+              {ev.active && <span className="ml-1 text-brand-orange">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3 mb-8">
         {CATEGORIES.map(cat => {
           const catTeams = teams.filter(t => t.category === cat)
-          const catScores = scores.filter(s => catTeams.some(t => t.id === s.teamId))
+          const catScores = filteredScores.filter(s => catTeams.some(t => t.id === s.teamId))
           const teamsWithScore = new Set(catScores.map(s => s.teamId)).size
           return (
             <div key={cat} className={`card border-${cat}/20 bg-${cat}/5`}>
@@ -193,7 +225,7 @@ export default function RankingView() {
       </div>
 
       {CATEGORIES.map(cat => (
-        <CategoryRanking key={cat} cat={cat} teams={teams} scores={scores} />
+        <CategoryRanking key={cat} cat={cat} teams={teams} scores={filteredScores} />
       ))}
     </motion.div>
   )

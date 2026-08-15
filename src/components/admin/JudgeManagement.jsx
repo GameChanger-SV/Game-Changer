@@ -7,8 +7,8 @@ import { useAuth } from '../../contexts/AuthContext'
 
 const CATEGORIES = [
   { value: 'elementary', label: 'Elementary' },
-  { value: 'junior', label: 'Junior' },
-  { value: 'senior', label: 'Senior' },
+  { value: 'junior',     label: 'Junior'     },
+  { value: 'senior',     label: 'Senior'     },
 ]
 
 const emptyForm = { name: '', email: '', password: '', category: 'elementary', judgeId: '' }
@@ -28,7 +28,8 @@ export default function JudgeManagement() {
   useEffect(() => {
     const q = query(collection(db, 'users'), where('role', '==', 'judge'))
     const unsub = onSnapshot(q, snap => {
-      setJudges(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      // Solo jueces RM (elementary / junior / senior)
+      setJudges(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => !u.category?.startsWith('rs_')))
     }, err => console.error('fetchJudges error:', err))
     return unsub
   }, [])
@@ -90,7 +91,7 @@ export default function JudgeManagement() {
     >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-white">Jueces</h1>
+          <h1 className="text-3xl font-extrabold text-white">Jueces RoboMission</h1>
           <p className="text-gray-400 mt-1">{filtered.length} de {judges.length} juez(ces)</p>
         </div>
         <motion.button whileTap={{ scale: 0.95 }} onClick={openCreate} className="btn-primary flex items-center gap-2">
