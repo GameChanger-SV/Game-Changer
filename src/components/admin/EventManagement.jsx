@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar, Plus, CheckCircle, X, AlertCircle,
-  Loader2, Archive, Radio, ChevronDown, ChevronUp
+  Loader2, Archive, Radio, ChevronDown, ChevronUp, UserCheck
 } from 'lucide-react'
 import {
   collection, onSnapshot, addDoc, updateDoc, doc,
@@ -17,8 +17,9 @@ export default function EventManagement() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm]         = useState(EMPTY_FORM)
   const [saving, setSaving]     = useState(false)
-  const [activating, setActivating] = useState(null)
-  const [migrating, setMigrating]   = useState(null)
+  const [activating, setActivating]       = useState(null)
+  const [migrating, setMigrating]         = useState(null)
+  const [backfilling, setBackfilling]     = useState(null)
   const [msg, setMsg]           = useState(null)
   const [expandedId, setExpandedId] = useState(null)
 
@@ -120,6 +121,78 @@ export default function EventManagement() {
     } catch (err) {
       showMsg('error', 'Error al migrar: ' + err.message)
     } finally { setMigrating(null) }
+  }
+
+  /**
+   * Para puntajes sin judgeName: busca el juez asignado a cada equipo
+   * y retroalimenta el nombre en cada score/rs_score del evento.
+   */
+  const handleBackfillJudgeNames = async (event) => {
+    if (!confirm(
+      `¿Completar el nombre del juez en los puntajes de "${event.name}"?\n\n` +
+      `Se usará el juez actualmente asignado a cada equipo. Si los jueces no cambiaron desde la competencia, esto es correcto.`
+    )) return
+
+    setBackfilling(event.id)
+    try {
+      // Cargar equipos, rs_teams y usuarios (jueces)
+      const [teamsSnap, rsTeamsSnap, usersSnap, scoresSnap, rsScoresSnap] = await Promise.all([
+        getDocs(collection(db, 'teams')),
+        getDocs(collection(db, 'rs_teams')),
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'scores')),
+        getDocs(collection(db, 'rs_scores')),
+      ])
+
+      const teamMap   = {}
+      teamsSnap.docs.forEach(d => { teamMap[d.id] = d.data() })
+      rsTeamsSnap.docs.forEach(d => { teamMap[d.id] = d.data() })
+
+      const judgeMap  = {}
+      usersSnap.docs.forEach(d => { judgeMap[d.id] = d.data().name || d.data().email || 'Juez' })
+
+      // Puntajes de este evento sin judgeName
+      const toUpdate = [
+        ...scoresSnap.docs
+          .filter(d => d.data().eventId === event.id && !d.data().judgeName)
+          .map(d => ({ col: 'scores', id: d.id, teamId: d.data().teamId })),
+        ...rsScoresSnap.docs
+          .filter(d => d.data().eventId === event.id && !d.data().judgeName)
+          .map(d => ({ col: 'rs_scores', id: d.id, teamId: d.data().teamId })),
+      ]
+
+      if (toUpdate.length === 0) {
+        showMsg('success', 'Todos los puntajes ya tienen nombre de juez.')
+        return
+      }
+
+      let updated = 0
+      let skipped = 0
+
+      for (let i = 0; i < toUpdate.length; i += 400) {
+        const chunk = toUpdate.slice(i, i + 400)
+        const batch = writeBatch(db)
+        chunk.forEach(({ col, id, teamId }) => {
+          const team     = teamMap[teamId]
+          const judgeId  = team?.assignedJudgeId
+          const name     = judgeId ? judgeMap[judgeId] : null
+          if (name) {
+            batch.update(doc(db, col, id), { judgeName: name })
+            updated++
+          } else {
+            skipped++
+          }
+        })
+        await batch.commit()
+      }
+
+      showMsg('success',
+        `Listo: ${updated} puntaje(s) actualizados con nombre de juez.` +
+        (skipped > 0 ? ` ${skipped} sin juez asignado (se dejaron igual).` : '')
+      )
+    } catch (err) {
+      showMsg('error', 'Error: ' + err.message)
+    } finally { setBackfilling(null) }
   }
 
   return (
@@ -244,19 +317,38 @@ export default function EventManagement() {
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                       <div className="mt-4 pt-4 border-t border-dark-600">
-                        <div className="flex items-start gap-3 p-3 rounded-xl bg-dark-700 border border-dark-500">
-                          <Archive size={16} className="text-yellow-400 shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-white">Asignar puntajes sin evento</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              Si tienes puntajes de antes de implementar el sistema de eventos, este botón los asigna todos a este evento. Útil para migrar datos históricos.
-                            </p>
+                        <div className="space-y-2">
+                          {/* Migrar puntajes sin evento */}
+                          <div className="flex items-start gap-3 p-3 rounded-xl bg-dark-700 border border-dark-500">
+                            <Archive size={16} className="text-yellow-400 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white">Asignar puntajes sin evento</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Asigna todos los puntajes sin evento a esta competencia.
+                              </p>
+                            </div>
+                            <button onClick={() => handleMigrate(ev)} disabled={!!migrating || !!backfilling}
+                              className="flex items-center gap-1.5 text-xs text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 shrink-0 whitespace-nowrap">
+                              {migrating === ev.id ? <Loader2 size={11} className="animate-spin" /> : <Archive size={11} />}
+                              Migrar puntajes
+                            </button>
                           </div>
-                          <button onClick={() => handleMigrate(ev)} disabled={!!migrating}
-                            className="flex items-center gap-1.5 text-xs text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 shrink-0 whitespace-nowrap">
-                            {migrating === ev.id ? <Loader2 size={11} className="animate-spin" /> : <Archive size={11} />}
-                            Migrar puntajes
-                          </button>
+
+                          {/* Completar nombre de juez */}
+                          <div className="flex items-start gap-3 p-3 rounded-xl bg-dark-700 border border-dark-500">
+                            <UserCheck size={16} className="text-sky-400 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white">Completar nombre del juez</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Retroalimenta el nombre del juez en puntajes que no lo tienen, usando el juez asignado a cada equipo.
+                              </p>
+                            </div>
+                            <button onClick={() => handleBackfillJudgeNames(ev)} disabled={!!migrating || !!backfilling}
+                              className="flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 shrink-0 whitespace-nowrap">
+                              {backfilling === ev.id ? <Loader2 size={11} className="animate-spin" /> : <UserCheck size={11} />}
+                              Completar jueces
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </motion.div>

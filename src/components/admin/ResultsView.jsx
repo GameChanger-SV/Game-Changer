@@ -258,6 +258,7 @@ export default function ResultsView() {
                                         <p className={`font-mono font-extrabold text-xl text-${activeCat}`}>{sc.total} pts</p>
                                         {sc.seconds && <p className="text-xs text-gray-500 mt-1">⏱ {sc.seconds}s</p>}
                                         <p className="text-xs text-gray-600 mt-1">{new Date(sc.savedAt).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}</p>
+                                        {sc.judgeName && <p className="text-xs text-gray-500 mt-1">👤 {sc.judgeName}</p>}
                                         <div className="mt-2 flex gap-1.5 flex-wrap">
                                           {isFinalized && (
                                             <button
