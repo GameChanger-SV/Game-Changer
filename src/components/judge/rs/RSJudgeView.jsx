@@ -36,23 +36,25 @@ const TOTAL_MAX = MISSION_MAX + DOC_MAX                         // 300
 // ─── Score sheet for one round ───────────────────────────────────────────────
 function ScoreSheet({ team, category, round, judgeUid, judgeName, eventId, onSaved }) {
   const cc = CAT_META[category]?.cc || CAT_META.elementary.cc
-  const scoreId = `${team.id}_r${round}`
+  // Include eventId in doc ID so each event has independent scores
+  const scoreId = eventId ? `${team.id}_r${round}_${eventId}` : `${team.id}_r${round}`
 
-  const [tab, setTab]           = useState('mission')
-  const [missionScore, setM]    = useState(0)
-  const [docScores, setDoc]     = useState({})
-  const [finalized, setFin]     = useState(false)
-  const [loading, setLoading]   = useState(true)
-  const [saving, setSaving]     = useState(false)
-  const [toast, setToast]       = useState(null)
+  const [tab, setTab]               = useState('mission')
+  const [missionScore, setMission]  = useState(0)
+  const [docScores, setDocScores]   = useState({})
+  const [finalized, setFin]         = useState(false)
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [toast, setToast]           = useState(null)
+  const [openHint, setOpenHint]     = useState(null)
 
   useEffect(() => {
-    setLoading(true); setTab('mission'); setM(0); setDoc({}); setFin(false)
+    setLoading(true); setTab('mission'); setMission(0); setDocScores({}); setFin(false); setOpenHint(null)
     getDoc(doc(db, 'rs_scores', scoreId)).then(snap => {
       if (snap.exists()) {
         const d = snap.data()
-        setM(d.missionScore ?? 0)
-        setDoc(d.docScores || {})
+        setMission(d.missionScore ?? 0)
+        setDocScores(d.docScores || {})
         setFin(d.finalized || false)
       }
       setLoading(false)
@@ -75,11 +77,14 @@ function ScoreSheet({ team, category, round, judgeUid, judgeName, eventId, onSav
   const save = async (finalize = false) => {
     setSaving(true)
     try {
-      await setDoc(doc(db, 'rs_scores', scoreId), buildPayload(finalize), { merge: true })
+      await setDoc(doc(db, 'rs_scores', scoreId), buildPayload(finalize))
       if (finalize) { setFin(true); showToast('success', '¡Ronda finalizada!') }
       else showToast('success', 'Guardado.')
       onSaved?.()
-    } catch { showToast('error', 'Error al guardar.') }
+    } catch (err) {
+      console.error('Error saving RS score:', err)
+      showToast('error', 'Error al guardar. Verifica tu conexión.')
+    }
     finally { setSaving(false) }
   }
 
@@ -133,12 +138,12 @@ function ScoreSheet({ team, category, round, judgeUid, judgeName, eventId, onSav
             <div className={`card ${cc.bg} border ${cc.border}`}>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Puntaje en tapete — Ronda {round}</p>
               <div className="flex items-center gap-4">
-                <button type="button" onClick={() => !finalized && setM(v => Math.max(0, v - 5))} disabled={finalized}
+                <button type="button" onClick={() => !finalized && setMission(v => Math.max(0, v - 5))} disabled={finalized}
                   className="w-10 h-10 rounded-xl bg-dark-600 border border-dark-500 text-gray-300 font-bold text-xl flex items-center justify-center disabled:opacity-40">−</button>
                 <input type="number" min={0} max={MISSION_MAX} value={missionScore} disabled={finalized}
-                  onChange={e => !finalized && setM(Math.min(MISSION_MAX, Math.max(0, Number(e.target.value))))}
+                  onChange={e => !finalized && setMission(Math.min(MISSION_MAX, Math.max(0, Number(e.target.value))))}
                   className={`w-28 text-center font-mono font-extrabold text-3xl bg-transparent border-b-2 ${cc.border} ${cc.text} focus:outline-none disabled:opacity-60`} />
-                <button type="button" onClick={() => !finalized && setM(v => Math.min(MISSION_MAX, v + 5))} disabled={finalized}
+                <button type="button" onClick={() => !finalized && setMission(v => Math.min(MISSION_MAX, v + 5))} disabled={finalized}
                   className="w-10 h-10 rounded-xl bg-dark-600 border border-dark-500 text-gray-300 font-bold text-xl flex items-center justify-center disabled:opacity-40">+</button>
                 <span className="text-gray-500 text-sm">/ {MISSION_MAX}</span>
               </div>
@@ -160,14 +165,16 @@ function ScoreSheet({ team, category, round, judgeUid, judgeName, eventId, onSav
             {/* Criteria */}
             {DOC_RUBRIC.map(criterion => {
               const val = docScores[criterion.id] ?? 0
-              const [hint, setHint] = useState(false)
+              const hintOpen = openHint === criterion.id
               return (
                 <div key={criterion.id} className="card">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-semibold text-white">{criterion.label}</p>
-                        <button type="button" onClick={() => setHint(h => !h)} className="text-gray-600 hover:text-gray-400">
+                        <button type="button"
+                          onClick={() => setOpenHint(h => h === criterion.id ? null : criterion.id)}
+                          className="text-gray-600 hover:text-gray-400">
                           <Info size={13} />
                         </button>
                       </div>
@@ -175,16 +182,16 @@ function ScoreSheet({ team, category, round, judgeUid, judgeName, eventId, onSav
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button type="button" disabled={finalized}
-                        onClick={() => !finalized && setDoc(s => ({ ...s, [criterion.id]: Math.max(0, (s[criterion.id] ?? 0) - 1) }))}
+                        onClick={() => !finalized && setDocScores(s => ({ ...s, [criterion.id]: Math.max(0, (s[criterion.id] ?? 0) - 1) }))}
                         className="w-8 h-8 rounded-lg bg-dark-600 border border-dark-500 text-gray-300 font-bold flex items-center justify-center disabled:opacity-40">−</button>
                       <span className={`w-8 text-center font-mono font-bold text-xl ${cc.text}`}>{val}</span>
                       <button type="button" disabled={finalized}
-                        onClick={() => !finalized && setDoc(s => ({ ...s, [criterion.id]: Math.min(criterion.maxPts, (s[criterion.id] ?? 0) + 1) }))}
+                        onClick={() => !finalized && setDocScores(s => ({ ...s, [criterion.id]: Math.min(criterion.maxPts, (s[criterion.id] ?? 0) + 1) }))}
                         className="w-8 h-8 rounded-lg bg-dark-600 border border-dark-500 text-gray-300 font-bold flex items-center justify-center disabled:opacity-40">+</button>
                     </div>
                   </div>
                   <AnimatePresence>
-                    {hint && (
+                    {hintOpen && (
                       <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }} className="text-xs text-gray-500 italic overflow-hidden mb-1">
                         {criterion.hint}
@@ -243,15 +250,17 @@ function TeamScoring({ team, category, judgeUid, judgeName, eventId, onBack, onL
   const [savedTotals, setSavedTotals] = useState({})
   const [showSummary, setShowSummary] = useState(false)
 
+  const scoreDocId = (r) => eventId ? `${team.id}_r${r}_${eventId}` : `${team.id}_r${r}`
+
   const loadTotals = () => {
-    Promise.all(ROUNDS.map(r => getDoc(doc(db, 'rs_scores', `${team.id}_r${r}`)))).then(snaps => {
+    Promise.all(ROUNDS.map(r => getDoc(doc(db, 'rs_scores', scoreDocId(r))))).then(snaps => {
       const d = {}
       snaps.forEach((snap, i) => { if (snap.exists()) d[i + 1] = snap.data() })
       setSavedTotals(d)
     })
   }
 
-  useEffect(() => { loadTotals() }, [team.id])
+  useEffect(() => { loadTotals() }, [team.id, eventId])
 
   const allSaved = ROUNDS.every(r => savedTotals[r] !== undefined)
 

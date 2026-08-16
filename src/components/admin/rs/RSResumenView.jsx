@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../../../firebase'
-import { Swords, Users, BarChart2, Medal, UserCheck, AlertCircle } from 'lucide-react'
+import { Swords, Users, BarChart2, Medal, UserCheck, AlertCircle, Calendar } from 'lucide-react'
 
 const CATS = [
   { value: 'elementary', label: 'Kids Elementary', judgesCat: 'rs_elementary',
@@ -18,6 +18,8 @@ export default function RSResumenView({ setTab }) {
   const [teams, setTeams]   = useState([])
   const [scores, setScores] = useState([])
   const [judges, setJudges] = useState([])
+  const [events, setEvents] = useState([])
+  const [selectedEventId, setSelectedEventId] = useState('all')
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db, 'rs_teams'),  s => setTeams(s.docs.map(d => ({ id: d.id, ...d.data() }))))
@@ -25,36 +27,65 @@ export default function RSResumenView({ setTab }) {
     const u3 = onSnapshot(collection(db, 'users'),     s =>
       setJudges(s.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => u.role === 'judge' && u.category?.startsWith('rs_')))
     )
-    return () => { u1(); u2(); u3() }
+    const u4 = onSnapshot(collection(db, 'events'), s => {
+      const evs = s.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      setEvents(evs)
+      const active = evs.find(e => e.active)
+      if (active) setSelectedEventId(prev => prev === 'all' ? active.id : prev)
+    })
+    return () => { u1(); u2(); u3(); u4() }
   }, [])
+
+  const filteredScores = selectedEventId === 'all'
+    ? scores
+    : scores.filter(s => s.eventId === selectedEventId)
 
   // Top 3 por categoría (mejor ronda individual)
   const topByCat = {}
   for (const cat of CATS) {
     const catTeams = teams.filter(t => t.category === cat.value)
     topByCat[cat.value] = catTeams.map(team => {
-      const ts   = scores.filter(s => s.teamId === team.id)
-      const valid = ROUNDS.map(r => ts.find(s => s.id === `${team.id}_r${r}`)?.total ?? null).filter(v => v !== null)
+      const ts    = filteredScores.filter(s => s.teamId === team.id)
+      const valid = ROUNDS.map(r => ts.find(s => s.round === r)?.total ?? null).filter(v => v !== null)
       return { team, best: valid.length ? Math.max(...valid) : null }
     }).filter(r => r.best !== null).sort((a, b) => b.best - a.best).slice(0, 3)
   }
 
   // Estadísticas globales
   const totalTeams     = teams.length
-  const totalScores    = scores.length
-  const finalizedCount = scores.filter(s => s.finalized).length
-  const teamsWithScore = new Set(scores.map(s => s.teamId)).size
+  const totalScores    = filteredScores.length
+  const finalizedCount = filteredScores.filter(s => s.finalized).length
+  const teamsWithScore = new Set(filteredScores.map(s => s.teamId)).size
   const teamsNoJudge   = teams.filter(t => !t.assignedJudgeId).length
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.25 }}>
-      <div className="flex items-center gap-3 mb-7">
+      <div className="flex items-center gap-3 mb-5">
         <Swords size={22} className="text-sky-400" />
         <div>
           <h1 className="text-3xl font-extrabold text-white">Resumen RoboStarter</h1>
           <p className="text-gray-400 text-sm mt-0.5">Kids Elementary · Kids Junior</p>
         </div>
       </div>
+
+      {/* Event selector */}
+      {events.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <Calendar size={14} className="text-gray-500 shrink-0" />
+          <span className="text-xs text-gray-500">Evento:</span>
+          {[{ id: 'all', name: 'Todos', date: '' }, ...events].map(ev => (
+            <button key={ev.id} onClick={() => setSelectedEventId(ev.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                selectedEventId === ev.id
+                  ? ev.active ? 'bg-sky-500/20 border-sky-500 text-sky-400' : 'bg-dark-600 border-dark-400 text-white'
+                  : 'border-dark-500 text-gray-400 hover:text-white hover:border-dark-400'
+              }`}>
+              {ev.name}{ev.active && <span className="ml-1 text-sky-400">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-7">
@@ -137,7 +168,7 @@ export default function RSResumenView({ setTab }) {
           {CATS.map(cat => {
             const catTeams = teams.filter(t => t.category === cat.value)
             const total    = catTeams.length * 3  // 3 rondas por equipo
-            const done     = scores.filter(s => catTeams.some(t => t.id === s.teamId)).length
+            const done     = filteredScores.filter(s => catTeams.some(t => t.id === s.teamId)).length
             const pct      = total > 0 ? Math.round((done / total) * 100) : 0
             const { cc }   = cat
             return (

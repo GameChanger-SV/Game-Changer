@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '../../../firebase'
-import { BarChart2, LockOpen, Trash2, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { BarChart2, LockOpen, Trash2, Loader2, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
 
 const CATS = [
   { value: 'elementary', label: 'Kids Elementary', cc: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400', bar: 'bg-green-500' } },
@@ -18,9 +18,11 @@ const DOC_RUBRIC = [
   { id: 'teamwork',     label: 'Trabajo en equipo' },
 ]
 
-export default function RSResultsView() {
+export default function RSResultsView({ initEventId = null }) {
   const [teams, setTeams]       = useState([])
   const [scores, setScores]     = useState([])
+  const [events, setEvents]     = useState([])
+  const [selectedEventId, setSelectedEventId] = useState(initEventId || 'all')
   const [loading, setLoading]   = useState(true)
   const [catTab, setCatTab]     = useState('elementary')
   const [expanded, setExpanded] = useState(null)
@@ -33,8 +35,19 @@ export default function RSResultsView() {
       setScores(s.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
-    return () => { u1(); u2() }
+    const u3 = onSnapshot(collection(db, 'events'), s => {
+      const evs = s.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      setEvents(evs)
+      const active = evs.find(e => e.active)
+      if (active) setSelectedEventId(prev => (prev === 'all' && !initEventId) ? active.id : prev)
+    })
+    return () => { u1(); u2(); u3() }
   }, [])
+
+  const filteredScores = selectedEventId === 'all'
+    ? scores
+    : scores.filter(s => s.eventId === selectedEventId)
 
   const cat = CATS.find(c => c.value === catTab)
   const cc  = cat?.cc || CATS[0].cc
@@ -43,7 +56,7 @@ export default function RSResultsView() {
     .filter(t => t.category === catTab)
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
 
-  const getScore = (teamId, round) => scores.find(s => s.id === `${teamId}_r${round}`) || null
+  const getScore = (teamId, round) => filteredScores.find(s => s.teamId === teamId && s.round === round) || null
 
   const handleUnlock = async (e, scoreId) => {
     e.stopPropagation()
@@ -67,6 +80,24 @@ export default function RSResultsView() {
         <BarChart2 size={22} className="text-green-400" />
         <h1 className="text-3xl font-extrabold text-white">Resultados RoboStarter</h1>
       </div>
+
+      {/* Event selector */}
+      {events.length > 0 && (
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <Calendar size={14} className="text-gray-500 shrink-0" />
+          <span className="text-xs text-gray-500">Evento:</span>
+          {[{ id: 'all', name: 'Todos', date: '' }, ...events].map(ev => (
+            <button key={ev.id} onClick={() => { setSelectedEventId(ev.id); setExpanded(null) }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                selectedEventId === ev.id
+                  ? ev.active ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-dark-600 border-dark-400 text-white'
+                  : 'border-dark-500 text-gray-400 hover:text-white hover:border-dark-400'
+              }`}>
+              {ev.name}{ev.active && <span className="ml-1 text-green-400">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Category tabs */}
       <div className="flex gap-2 bg-dark-700 p-1 rounded-xl mb-5 w-fit">

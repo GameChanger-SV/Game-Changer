@@ -35,6 +35,7 @@ const NAV_RS = [
 export default function AdminDashboard() {
   const { profile, logout } = useAuth()
   const [tab, setTab] = useState('overview')
+  const [initEventId, setInitEventId] = useState(null)
 
   return (
     <div className="min-h-screen flex">
@@ -121,14 +122,14 @@ export default function AdminDashboard() {
           {tab === 'overview'      && <OverviewTab key="overview" setTab={setTab} />}
           {tab === 'judges'        && <JudgeManagement key="judges" />}
           {tab === 'teams'         && <TeamManagement key="teams" />}
-          {tab === 'results'       && <ResultsView key="results" />}
-          {tab === 'ranking'       && <RankingView key="ranking" />}
+          {tab === 'results'       && <ResultsView key="results" initEventId={initEventId} />}
+          {tab === 'ranking'       && <RankingView key="ranking" initEventId={initEventId} />}
           {tab === 'institutions'  && <InstitutionManagement key="institutions" />}
-          {tab === 'events'        && <EventManagement key="events" />}
+          {tab === 'events'        && <EventManagement key="events" onView={(evId, module) => { setInitEventId(evId); setTab(module === 'rs' ? 'rs_results' : 'results') }} />}
           {tab === 'rs_overview'   && <RSResumenView key="rs_overview" setTab={setTab} />}
           {tab === 'rs_judges'     && <RSJudgeManagement key="rs_judges" />}
           {tab === 'rs_teams'      && <RSTeamManagement key="rs_teams" />}
-          {tab === 'rs_results'    && <RSResultsView key="rs_results" />}
+          {tab === 'rs_results'    && <RSResultsView key="rs_results" initEventId={initEventId} />}
           {tab === 'rs_ranking'    && <RSRankingView key="rs_ranking" />}
         </AnimatePresence>
       </main>
@@ -138,39 +139,65 @@ export default function AdminDashboard() {
 
 // ─── Overview RM ────────────────────────────────────────────────────────────
 
-function useTopTeams() {
-  const [teams, setTeams]   = useState([])
-  const [scores, setScores] = useState([])
+function OverviewTab({ setTab }) {
+  const [teams, setTeams]           = useState([])
+  const [scores, setScores]         = useState([])
+  const [events, setEvents]         = useState([])
+  const [selectedEventId, setSelectedEventId] = useState('all')
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db, 'teams'),  snap => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     const u2 = onSnapshot(collection(db, 'scores'), snap => setScores(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    return () => { u1(); u2() }
+    const u3 = onSnapshot(collection(db, 'events'), snap => {
+      const evs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      setEvents(evs)
+      const active = evs.find(e => e.active)
+      if (active) setSelectedEventId(prev => prev === 'all' ? active.id : prev)
+    })
+    return () => { u1(); u2(); u3() }
   }, [])
 
-  const top = {}
+  const filteredScores = selectedEventId === 'all'
+    ? scores
+    : scores.filter(s => s.eventId === selectedEventId)
+
+  const topTeams = {}
   for (const cat of ['elementary', 'junior', 'senior']) {
     const catTeams = teams.filter(t => t.category === cat)
     const ranked = catTeams.map(team => {
-      const teamScores = scores.filter(s => s.teamId === team.id)
+      const teamScores = filteredScores.filter(s => s.teamId === team.id)
       const sum  = teamScores.length ? teamScores.reduce((acc, s) => acc + (s.total ?? 0), 0) : null
       const best = teamScores.length ? Math.max(...teamScores.map(s => s.total ?? 0)) : null
       return { team, sum, best }
     }).filter(r => r.sum !== null).sort((a, b) => b.sum - a.sum).slice(0, 3)
-    top[cat] = ranked
+    topTeams[cat] = ranked
   }
-  return top
-}
-
-function OverviewTab({ setTab }) {
-  const topTeams = useTopTeams()
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.25 }}>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-extrabold text-white">Panel de Administración</h1>
         <p className="text-gray-400 mt-1">WRO RoboMission 2026 – Game Changer Robotics</p>
       </div>
+
+      {/* Event selector */}
+      {events.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <Calendar size={14} className="text-gray-500 shrink-0" />
+          <span className="text-xs text-gray-500">Evento:</span>
+          {[{ id: 'all', name: 'Todos', date: '' }, ...events].map(ev => (
+            <button key={ev.id} onClick={() => setSelectedEventId(ev.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                selectedEventId === ev.id
+                  ? ev.active ? 'bg-brand-orange/20 border-brand-orange text-brand-orange' : 'bg-dark-600 border-dark-400 text-white'
+                  : 'border-dark-500 text-gray-400 hover:text-white hover:border-dark-400'
+              }`}>
+              {ev.name}{ev.active && <span className="ml-1 text-brand-orange">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Top 3 per category */}
       <div className="grid grid-cols-3 gap-4 mb-8">

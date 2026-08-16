@@ -55,7 +55,8 @@ function ToggleInput({ value, onChange, color, disabled }) {
 
 export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, judgeName = null, eventId = null, readOnly = false, locked = false }) {
   const colorKey = CAT_COLORS[category]
-  const docId = `${team.id}_round${round}`
+  // Include eventId so each event has its own independent score doc
+  const docId = eventId ? `${team.id}_round${round}_${eventId}` : `${team.id}_round${round}`
   const [scores, setScores]       = useState({})
   const [seconds, setSeconds]     = useState('')
   const [saved, setSaved]         = useState(false)

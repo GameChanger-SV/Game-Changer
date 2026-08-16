@@ -9,11 +9,11 @@ const ROUNDS = [1, 2, 3]
 
 const CAT_LABEL = { elementary: 'Elementary', junior: 'Junior', senior: 'Senior' }
 
-export default function ResultsView() {
+export default function ResultsView({ initEventId = null }) {
   const [scores, setScores]       = useState([])
   const [teams, setTeams]         = useState([])
   const [events, setEvents]       = useState([])
-  const [selectedEventId, setSelectedEventId] = useState('all')
+  const [selectedEventId, setSelectedEventId] = useState(initEventId || 'all')
   const [activeCat, setActiveCat] = useState('elementary')
   const [expandedTeam, setExpandedTeam] = useState(null)
   const [unlocking, setUnlocking] = useState(null)
@@ -54,7 +54,7 @@ export default function ResultsView() {
       setEvents(evs)
       // Auto-select active event on first load
       const active = evs.find(e => e.active)
-      if (active) setSelectedEventId(prev => prev === 'all' ? active.id : prev)
+      if (active) setSelectedEventId(prev => (prev === 'all' && !initEventId) ? active.id : prev)
     })
     return () => { u1(); u2(); u3() }
   }, [])

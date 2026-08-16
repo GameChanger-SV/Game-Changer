@@ -263,10 +263,13 @@ function TeamScoring({ team, config, cat, judgeUid, profile, eventId, onBack, on
   const [showSummary, setShowSummary] = useState(false)
 
   // Load saved totals for all 3 rounds (for summary and completion indicator)
+  // Use eventId in doc ID so each event has independent scores
+  const scoreDocId = (r) => eventId ? `${team.id}_round${r}_${eventId}` : `${team.id}_round${r}`
+
   useEffect(() => {
     const fetchTotals = async () => {
       const rounds = await Promise.all(
-        ROUNDS.map(r => getDoc(doc(db, 'scores', `${team.id}_round${r}`)))
+        ROUNDS.map(r => getDoc(doc(db, 'scores', scoreDocId(r))))
       )
       const totals = {}
       rounds.forEach((snap, i) => {
@@ -275,7 +278,7 @@ function TeamScoring({ team, config, cat, judgeUid, profile, eventId, onBack, on
       setSavedTotals(totals)
     }
     fetchTotals()
-  }, [team.id])
+  }, [team.id, eventId])
 
   const allSaved = ROUNDS.every(r => savedTotals[r] !== undefined)
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar, Plus, CheckCircle, X, AlertCircle,
-  Loader2, Archive, Radio, ChevronDown, ChevronUp, UserCheck
+  Loader2, Archive, Radio, ChevronDown, ChevronUp, UserCheck, Eye, PowerOff
 } from 'lucide-react'
 import {
   collection, onSnapshot, addDoc, updateDoc, doc,
@@ -12,7 +12,7 @@ import { db } from '../../firebase'
 
 const EMPTY_FORM = { name: '', date: '' }
 
-export default function EventManagement() {
+export default function EventManagement({ onView }) {
   const [events, setEvents]     = useState([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm]         = useState(EMPTY_FORM)
@@ -62,14 +62,21 @@ export default function EventManagement() {
     setActivating(event.id)
     try {
       const batch = writeBatch(db)
-      // Deactivate all
-      events.forEach(ev => {
-        batch.update(doc(db, 'events', ev.id), { active: false })
-      })
-      // Activate selected
+      events.forEach(ev => batch.update(doc(db, 'events', ev.id), { active: false }))
       batch.update(doc(db, 'events', event.id), { active: true })
       await batch.commit()
       showMsg('success', `"${event.name}" es ahora el evento activo.`)
+    } catch (err) {
+      showMsg('error', err.message)
+    } finally { setActivating(null) }
+  }
+
+  const handleDeactivate = async (event) => {
+    if (!confirm(`¿Desactivar "${event.name}"? No se podrán registrar puntajes hasta que actives un evento.`)) return
+    setActivating(event.id)
+    try {
+      await updateDoc(doc(db, 'events', event.id), { active: false })
+      showMsg('success', `"${event.name}" desactivado. Los puntajes guardados no se modifican.`)
     } catch (err) {
       showMsg('error', err.message)
     } finally { setActivating(null) }
@@ -297,12 +304,28 @@ export default function EventManagement() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
-                    {!ev.active && (
-                      <button onClick={() => handleSetActive(ev)} disabled={!!activating}
-                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-brand-orange bg-dark-600 hover:bg-brand-orange/10 border border-dark-500 hover:border-brand-orange/30 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50">
-                        {activating === ev.id ? <Loader2 size={11} className="animate-spin" /> : <Radio size={11} />}
-                        Activar
+                    {ev.active ? (
+                      <button onClick={() => handleDeactivate(ev)} disabled={!!activating}
+                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-400 bg-dark-600 hover:bg-red-500/10 border border-dark-500 hover:border-red-500/30 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50">
+                        {activating === ev.id ? <Loader2 size={11} className="animate-spin" /> : <PowerOff size={11} />}
+                        Desactivar
                       </button>
+                    ) : (
+                      <>
+                        <button onClick={() => onView?.(ev.id, 'rm')}
+                          className="flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 px-3 py-1.5 rounded-lg transition-all">
+                          <Eye size={11} /> Ver RM
+                        </button>
+                        <button onClick={() => onView?.(ev.id, 'rs')}
+                          className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 px-3 py-1.5 rounded-lg transition-all">
+                          <Eye size={11} /> Ver RS
+                        </button>
+                        <button onClick={() => handleSetActive(ev)} disabled={!!activating}
+                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-brand-orange bg-dark-600 hover:bg-brand-orange/10 border border-dark-500 hover:border-brand-orange/30 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50">
+                          {activating === ev.id ? <Loader2 size={11} className="animate-spin" /> : <Radio size={11} />}
+                          Activar
+                        </button>
+                      </>
                     )}
                     <button onClick={() => setExpandedId(isExpanded ? null : ev.id)}
                       className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors">
