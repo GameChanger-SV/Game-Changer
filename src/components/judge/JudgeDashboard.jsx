@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import ScoreSheet from './scoring/ScoreSheet'
 import RSJudgeView from './rs/RSJudgeView'
+import GCJudgeDashboard from '../gcfest/GCJudgeDashboard'
 import {
   ELEMENTARY_MISSIONS, ELEMENTARY_MAX,
   JUNIOR_MISSIONS, JUNIOR_MAX,
@@ -61,6 +62,11 @@ export default function JudgeDashboard() {
   // RS judges get the RoboStarter scoring interface
   if (cat === 'rs_elementary' || cat === 'rs_junior') {
     return <RSJudgeView category={cat.replace('rs_', '')} eventId={activeEvent?.id ?? null} />
+  }
+
+  // GC Fest judges get the GC Fest scoring interface
+  if (cat === 'gc_elementary' || cat === 'gc_junior' || cat === 'gc_senior') {
+    return <GCJudgeDashboard category={cat.replace('gc_', '')} eventId={activeEvent?.id ?? null} />
   }
 
   const config = CAT_CONFIG[cat] || CAT_CONFIG.elementary

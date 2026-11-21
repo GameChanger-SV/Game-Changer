@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Trophy, LogOut, ChevronRight, LayoutDashboard, UserPlus, Flag, BarChart2, Medal, Building2, Star, Swords, Calendar } from 'lucide-react'
+import { Users, Trophy, LogOut, ChevronRight, LayoutDashboard, UserPlus, Flag, BarChart2, Medal, Building2, Star, Swords, Calendar, ArrowLeftRight } from 'lucide-react'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -32,7 +32,7 @@ const NAV_RS = [
   { id: 'rs_ranking',  label: 'Ranking RS',       icon: Medal },
 ]
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ onSwitchModule }) {
   const { profile, logout } = useAuth()
   const [tab, setTab] = useState('overview')
   const [initEventId, setInitEventId] = useState(null)
@@ -109,6 +109,12 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-500 truncate">{profile?.email}</p>
             </div>
           </div>
+          {onSwitchModule && (
+            <button onClick={onSwitchModule}
+              className="w-full flex items-center gap-2 px-3 py-2 mb-1 text-sm text-gray-400 hover:text-white hover:bg-dark-700 rounded-xl transition-all">
+              <ArrowLeftRight size={16} /> Cambiar competencia
+            </button>
+          )}
           <button onClick={logout}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
             <LogOut size={16} /> Cerrar sesión

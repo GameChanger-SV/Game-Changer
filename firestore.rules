@@ -65,5 +65,15 @@ service cloud.firestore {
       allow update: if isAdmin() || (isJudge() && resource.data.judgeUid == request.auth.uid && resource.data.finalized == false);
       allow delete: if isAdmin();
     }
+
+    // ── GC Fest (misma lógica que RoboMission: teams / scores) ──
+    match /gc_teams/{id} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /gc_scores/{id} {
+      allow read: if request.auth != null;
+      allow write: if isJudge() || isAdmin();
+    }
   }
 }
