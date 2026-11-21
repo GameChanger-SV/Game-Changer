@@ -423,18 +423,17 @@ export default function GCTeamManagement() {
 
                 <div>
                   <label className="block text-sm text-gray-400 mb-2 font-medium">
-                    Integrantes (máx. 3)
+                    Integrantes (opcional, máx. 3)
                   </label>
                   <div className="space-y-2">
                     {[0, 1, 2].map(idx => (
-                      <input key={idx} className="input-field" placeholder={`Integrante ${idx + 1}${idx < 2 ? ' *' : ' (opcional)'}`}
+                      <input key={idx} className="input-field" placeholder={`Integrante ${idx + 1} (opcional)`}
                         value={form.members[idx] || ''}
                         onChange={e => {
                           const newMembers = [...form.members]
                           newMembers[idx] = e.target.value
                           setForm(f => ({ ...f, members: newMembers }))
                         }}
-                        required={idx < 2}
                       />
                     ))}
                   </div>
