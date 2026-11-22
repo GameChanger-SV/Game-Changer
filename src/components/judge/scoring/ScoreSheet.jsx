@@ -53,7 +53,7 @@ function ToggleInput({ value, onChange, color, disabled }) {
   )
 }
 
-export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, judgeName = null, eventId = null, readOnly = false, locked = false }) {
+export default function ScoreSheet({ team, category, round, missions, maxScore, judgeUid, judgeName = null, eventId = null, readOnly = false, locked = false, collectionName = 'scores' }) {
   const colorKey = CAT_COLORS[category]
   // Include eventId so each event has its own independent score doc
   const docId = eventId ? `${team.id}_round${round}_${eventId}` : `${team.id}_round${round}`
@@ -88,7 +88,8 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
       const next      = { ...s, [itemId]: newValue }
       const partnerId = mutualMap[itemId]
       if (partnerId !== undefined && newValue > 0) {
-        const sharedMax   = itemMaxMap[itemId]
+        // Límite compartido del par completo/parcial (el mayor de los dos; en RM siempre son iguales)
+        const sharedMax   = Math.max(itemMaxMap[itemId], itemMaxMap[partnerId])
         next[partnerId]   = Math.max(0, Math.min(s[partnerId] || 0, sharedMax - newValue))
       }
       return next
@@ -107,7 +108,7 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
     setSaveError(null)
 
     setFinalized(false)
-    getDoc(doc(db, 'scores', docId)).then(snap => {
+    getDoc(doc(db, collectionName, docId)).then(snap => {
       if (snap.exists()) {
         const data = snap.data()
         setScores(data.scores || init)
@@ -133,7 +134,7 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
     setSaving(true)
     setSaveError(null)
     try {
-      await setDoc(doc(db, 'scores', docId), {
+      await setDoc(doc(db, collectionName, docId), {
         teamId:    team.id,
         teamName:  team.name,
         category,
@@ -164,7 +165,7 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
     if (!confirm(`¿Finalizar Ronda ${round}? Ya no podrás modificar los puntajes a menos que el administrador lo permita.`)) return
     setFinalizing(true)
     try {
-      await updateDoc(doc(db, 'scores', docId), { finalized: true, finalizedAt: new Date().toISOString() })
+      await updateDoc(doc(db, collectionName, docId), { finalized: true, finalizedAt: new Date().toISOString() })
       setFinalized(true)
     } catch {
       alert('No se pudo finalizar. Intenta de nuevo.')

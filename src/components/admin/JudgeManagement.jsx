@@ -28,8 +28,8 @@ export default function JudgeManagement() {
   useEffect(() => {
     const q = query(collection(db, 'users'), where('role', '==', 'judge'))
     const unsub = onSnapshot(q, snap => {
-      // Solo jueces RM (elementary / junior / senior)
-      setJudges(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => !u.category?.startsWith('rs_')))
+      // Solo jueces RM (elementary / junior / senior) — excluye RoboStarter y GC Fest
+      setJudges(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => !u.category?.startsWith('rs_') && !u.category?.startsWith('gc_')))
     }, err => console.error('fetchJudges error:', err))
     return unsub
   }, [])
