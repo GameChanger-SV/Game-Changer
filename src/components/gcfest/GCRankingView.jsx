@@ -20,15 +20,15 @@ function CategoryRanking({ cat, teams, scores }) {
   const catTeams = teams.filter(t => t.category === cat)
   const max = CAT_MAX[cat]
 
-  // Mejor ronda; desempate por menor tiempo en esa ronda
+  // Suma de las rondas; desempate por menor tiempo total
   const ranked = rankGCTeams(catTeams, scores).map(row => {
     const roundMap = {}
     Object.values(row.roundMap).forEach(s => { roundMap[s.round] = s.total })
     return { ...row, roundMap }
   })
 
-  const scoredTeams = ranked.filter(r => r.best !== null)
-  const pendingTeams = ranked.filter(r => r.best === null)
+  const scoredTeams = ranked.filter(r => r.total !== null)
+  const pendingTeams = ranked.filter(r => r.total === null)
 
   return (
     <motion.div
@@ -49,8 +49,8 @@ function CategoryRanking({ cat, teams, scores }) {
       ) : (
         <div className="space-y-2">
           {/* Scored teams */}
-          {scoredTeams.map(({ team, best, bestTime, roundMap }, idx) => {
-            const pct = Math.round((best / max) * 100)
+          {scoredTeams.map(({ team, best, total, totalTime, roundMap }, idx) => {
+            const pct = Math.round((total / (max * 3)) * 100)
             const pos = idx + 1
             return (
               <motion.div
@@ -102,9 +102,9 @@ function CategoryRanking({ cat, teams, scores }) {
 
                 {/* Scores */}
                 <div className="text-right shrink-0 min-w-[90px]">
-                  <p className={`font-mono font-extrabold text-xl text-${cat}`}>{best}</p>
-                  <p className="text-xs text-gray-500">mejor ronda · {pct}%</p>
-                  <p className="text-xs text-gray-600 mt-0.5">⏱ {bestTime !== null ? `${bestTime}s` : 'sin tiempo'}</p>
+                  <p className={`font-mono font-extrabold text-xl text-${cat}`}>{total}</p>
+                  <p className="text-xs text-gray-500">suma · {pct}%</p>
+                  <p className="text-xs text-gray-600 mt-0.5">⏱ {totalTime !== null ? `${totalTime}s` : 'tiempo incompleto'}</p>
                 </div>
               </motion.div>
             )
@@ -172,7 +172,7 @@ export default function GCRankingView() {
     >
       <div className="mb-6">
         <h1 className="text-3xl font-extrabold text-white">Ranking GC Fest</h1>
-        <p className="text-gray-400 mt-1">Clasificación por mejor ronda · Desempate por menor tiempo · Tiempo real</p>
+        <p className="text-gray-400 mt-1">Clasificación por suma de 3 rondas · Desempate por menor tiempo total · Tiempo real</p>
       </div>
 
       {/* Event selector */}

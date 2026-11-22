@@ -217,22 +217,25 @@ export const GC_JUDGE_PREFIX = 'gc_'
 // del PDF (#7E3FB0) para que se lea bien sobre el fondo oscuro.
 export const GC_PURPLE = '#A86ADB'
 
-// Ranking: mejor ronda; desempate por menor tiempo en esa ronda
+// Ranking: suma de las rondas; desempate por menor tiempo total (suma de los tiempos)
 export function rankGCTeams(teams, scores) {
   const rows = teams.map(team => {
     const teamScores = scores.filter(s => s.teamId === team.id)
     const roundMap = {}
     teamScores.forEach(s => { roundMap[s.round] = s })
-    if (teamScores.length === 0) return { team, best: null, bestTime: null, roundMap }
-    // Mejor ronda = mayor puntaje; si empata dentro del equipo, la de menor tiempo
-    const bestScore = [...teamScores].sort((a, b) => (b.total ?? 0) - (a.total ?? 0) || compareTime(a.seconds, b.seconds))[0]
-    return { team, best: bestScore.total ?? 0, bestTime: toSeconds(bestScore.seconds), roundMap }
+    if (teamScores.length === 0) return { team, total: null, totalTime: null, best: null, roundMap }
+    const total = teamScores.reduce((acc, s) => acc + (s.total ?? 0), 0)
+    const best  = Math.max(...teamScores.map(s => s.total ?? 0))
+    // Tiempo total solo si todas las rondas calificadas tienen tiempo; si falta uno, va después en un empate
+    const times = teamScores.map(s => toSeconds(s.seconds))
+    const totalTime = times.some(t => t === null) ? null : times.reduce((x, y) => x + y, 0)
+    return { team, total, totalTime, best, roundMap }
   })
   return rows.sort((a, b) => {
-    if (a.best === null && b.best === null) return 0
-    if (a.best === null) return 1
-    if (b.best === null) return -1
-    return b.best - a.best || compareTime(a.bestTime, b.bestTime)
+    if (a.total === null && b.total === null) return 0
+    if (a.total === null) return 1
+    if (b.total === null) return -1
+    return b.total - a.total || compareTime(a.totalTime, b.totalTime)
   })
 }
 

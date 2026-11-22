@@ -150,11 +150,11 @@ function GCOverview({ setTab }) {
         </div>
       )}
 
-      {/* Top 3 per category (mejor ronda, desempate por tiempo) */}
+      {/* Top 3 per category (suma de rondas, desempate por tiempo total) */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {GC_CATEGORIES.map(cat => {
           const top3 = rankGCTeams(teams.filter(t => t.category === cat), filteredScores)
-            .filter(r => r.best !== null).slice(0, 3)
+            .filter(r => r.total !== null).slice(0, 3)
           return (
             <motion.div key={cat} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               className={`card border-${cat}/30 bg-gradient-to-br from-${cat}/10 to-transparent`}>
@@ -166,7 +166,7 @@ function GCOverview({ setTab }) {
                 <p className="text-gray-600 text-sm">Sin puntajes aún</p>
               ) : (
                 <div className="space-y-3">
-                  {top3.map(({ team, best, bestTime }, i) => (
+                  {top3.map(({ team, total, totalTime }, i) => (
                     <div key={team.id} className={`flex items-center gap-2 ${i === 0 ? '' : 'opacity-75'}`}>
                       <span className="text-base shrink-0">{medals[i]}</span>
                       <div className="flex-1 min-w-0">
@@ -179,8 +179,8 @@ function GCOverview({ setTab }) {
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className={`font-mono font-bold text-sm text-${cat}`}>{best}</p>
-                        <p className="text-xs text-gray-600">{bestTime !== null ? `⏱ ${bestTime}s` : 'sin tiempo'}</p>
+                        <p className={`font-mono font-bold text-sm text-${cat}`}>{total}</p>
+                        <p className="text-xs text-gray-600">{totalTime !== null ? `⏱ ${totalTime}s` : 'tiempo incompleto'}</p>
                       </div>
                     </div>
                   ))}
