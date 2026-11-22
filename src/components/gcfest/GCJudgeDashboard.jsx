@@ -332,8 +332,15 @@ function TeamScoring({ team, config, cat, judgeUid, profile, eventId, onBack, on
               </div>
               <div className={`mt-5 pt-4 border-t border-dark-600 space-y-2`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 font-medium">Mejor ronda (cuenta para el ranking)</span>
+                  <span className="text-gray-400 font-medium">Suma total (cuenta para el ranking)</span>
                   <span className={`font-mono font-extrabold text-2xl text-${config.color}`}>
+                    {ROUNDS.reduce((acc, r) => acc + (savedTotals[r] ?? 0), 0)}
+                    <span className="text-sm text-gray-500 font-normal ml-1">pts</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Mejor ronda</span>
+                  <span className={`font-mono font-bold text-lg text-${config.color} opacity-75`}>
                     {Math.max(...ROUNDS.map(r => savedTotals[r] ?? 0))}
                     <span className="text-sm text-gray-500 font-normal ml-1">pts</span>
                   </span>

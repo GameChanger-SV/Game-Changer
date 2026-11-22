@@ -68,17 +68,17 @@ export default function GCResultsView({ initEventId = null }) {
   // Filter teams by category
   const catTeams = teams.filter(t => t.category === activeCat)
 
-  // Mejor ronda; desempate por menor tiempo en esa ronda
+  // Suma de las rondas; desempate por menor tiempo total
   const teamRows = rankGCTeams(catTeams, filteredScores).map(row => ({
     ...row,
     roundScores: ROUNDS.map(r => row.roundMap[r]?.total ?? null),
   }))
 
   const handleExport = () => {
-    const rows = [['Posición', 'Equipo', 'Número', 'Escuela', 'Ciudad', 'Ronda 1', 'Ronda 2', 'Ronda 3', 'Mejor Puntaje', 'Tiempo mejor ronda (s)']]
+    const rows = [['Posición', 'Equipo', 'Número', 'Escuela', 'Ciudad', 'Ronda 1', 'Ronda 2', 'Ronda 3', 'Suma', 'Tiempo total (s)']]
     teamRows.forEach((row, i) => {
       rows.push([
-        row.best !== null ? i + 1 : '-',
+        row.total !== null ? i + 1 : '-',
         row.team.name,
         row.team.number || '',
         row.team.school || '',
@@ -86,8 +86,8 @@ export default function GCResultsView({ initEventId = null }) {
         row.roundScores[0] ?? '',
         row.roundScores[1] ?? '',
         row.roundScores[2] ?? '',
-        row.best ?? '',
-        row.bestTime ?? '',
+        row.total ?? '',
+        row.totalTime ?? '',
       ])
     })
     const csv = rows.map(r => r.join(',')).join('\n')
@@ -110,7 +110,7 @@ export default function GCResultsView({ initEventId = null }) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-extrabold text-white">Resultados GC Fest</h1>
-          <p className="text-gray-400 mt-1">Mejor ronda · desempate por menor tiempo</p>
+          <p className="text-gray-400 mt-1">Suma de las 3 rondas · desempate por menor tiempo total</p>
         </div>
         <button onClick={handleExport} className="btn-ghost flex items-center gap-2 text-sm">
           <Download size={16} /> Exportar CSV
@@ -169,12 +169,12 @@ export default function GCResultsView({ initEventId = null }) {
                 {ROUNDS.map(r => (
                   <th key={r} className="text-center text-xs text-gray-500 font-medium px-4 py-3 w-24">Ronda {r}</th>
                 ))}
-                <th className="text-center text-xs text-gray-500 font-medium px-4 py-3 w-28">Mejor</th>
+                <th className="text-center text-xs text-gray-500 font-medium px-4 py-3 w-28">Suma</th>
                 <th className="w-8 px-3 py-3" />
               </tr>
             </thead>
             <tbody>
-              {teamRows.map(({ team, roundScores, best, bestTime }, idx) => (
+              {teamRows.map(({ team, roundScores, total, totalTime }, idx) => (
                 <>
                   <tr
                     key={team.id}
@@ -183,11 +183,11 @@ export default function GCResultsView({ initEventId = null }) {
                   >
                     <td className="px-5 py-3">
                       <span className={`text-sm font-bold font-mono ${
-                        best !== null
+                        total !== null
                           ? idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-gray-300' : idx === 2 ? 'text-amber-600' : `text-${activeCat}`
                           : 'text-gray-600'
                       }`}>
-                        {best !== null ? idx + 1 : '—'}
+                        {total !== null ? idx + 1 : '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -204,10 +204,10 @@ export default function GCResultsView({ initEventId = null }) {
                       </td>
                     ))}
                     <td className="text-center px-4 py-3">
-                      {best !== null ? (
+                      {total !== null ? (
                         <>
-                          <span className={`font-mono font-extrabold text-base text-${activeCat}`}>{best}</span>
-                          {bestTime !== null && <p className="text-xs text-gray-500">⏱ {bestTime}s</p>}
+                          <span className={`font-mono font-extrabold text-base text-${activeCat}`}>{total}</span>
+                          {totalTime !== null && <p className="text-xs text-gray-500">⏱ {totalTime}s</p>}
                         </>
                       ) : (
                         <span className="text-gray-600 text-sm">—</span>
