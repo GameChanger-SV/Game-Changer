@@ -1,5 +1,5 @@
 // Hojas de puntuación GC Fest 2026 (Game Changer · Liga Nacional de Robótica)
-// Fuente: "Hoja de puntuación" al final de cada PDF de reglas (Elementary, Junior, Senior).
+// Fuente: Rubrica_<Categoría>_GCFest_2026_CORREGIDA.pdf (hojas corregidas por la organización).
 // Mismo formato que scoringData.js de RoboMission para reutilizar ScoreSheet.
 //
 //   count:      true = contador (varios objetos), false = interruptor sí/no
@@ -9,17 +9,14 @@
 //   mutualWith: fila "completamente" vs "parcialmente" — un objeto solo puntúa en una de las dos
 
 // ─── ELEMENTARY — Rescate Patrimonial en Joya de Cerén ──────────────────────
-// Ajustes para que la hoja sume 215 (ver explicación en el resumen de entrega):
-//   - Misión 1: máx 80 = 4 artefactos × 10 + 8 cubos × 5
-//   - Herramienta parcial: el PDF no le da puntos; se usan 5 (no cambia el máximo)
-//   - Estacionamiento: el PDF dice 30 (máx 60); se usa 10, igual que Senior
+// Hoja corregida: máximo 295 (8 artefactos, 8 cubos, 4 barreras, estacionamiento 30)
 export const GC_ELEMENTARY_MISSIONS = [
   {
     id: 'm1',
     title: '1. Preparación de los espacios',
     description: 'Artefactos y cubos dentro de la zona objetivo de su color.',
     items: [
-      { id: 'm1_a', label: 'Artefacto (rojo, amarillo, azul o verde) completamente dentro de su zona objetivo', count: true, max: 4, perItem: 10, totalMax: 40 },
+      { id: 'm1_a', label: 'Artefacto (rojo, amarillo, azul o verde) completamente dentro de su zona objetivo', count: true, max: 8, perItem: 10, totalMax: 80 },
       { id: 'm1_b', label: 'Cubo completamente dentro de la zona objetivo de su color', count: true, max: 8, perItem: 5, totalMax: 40 },
     ]
   },
@@ -46,7 +43,7 @@ export const GC_ELEMENTARY_MISSIONS = [
     title: '4. Estacionamiento final',
     description: 'El robot termina en el cuadrado blanco de Aramco.',
     items: [
-      { id: 'm4_a', label: 'El robot se detiene completamente dentro de la zona de estacionamiento (cuadrado blanco de Aramco)', count: false, max: 1, perItem: 10, totalMax: 10 },
+      { id: 'm4_a', label: 'El robot se detiene completamente dentro de la zona de estacionamiento (cuadrado blanco de Aramco)', count: false, max: 1, perItem: 30, totalMax: 30 },
     ]
   },
   {
@@ -62,16 +59,15 @@ export const GC_ELEMENTARY_MISSIONS = [
     title: '6. Puntos extras',
     description: 'Barreras sin mover.',
     items: [
-      { id: 'm6_a', label: 'Barrera en su posición inicial, sin ser derribada ni desplazada significativamente', count: true, max: 2, perItem: 10, totalMax: 20 },
+      { id: 'm6_a', label: 'Barrera en su posición inicial, sin ser derribada ni desplazada significativamente', count: true, max: 4, perItem: 10, totalMax: 40 },
     ]
   },
 ]
 
-export const GC_ELEMENTARY_MAX = 215
+export const GC_ELEMENTARY_MAX = 295
 
 // ─── JUNIOR — El Salvador Suena ─────────────────────────────────────────────
-// Suma 245 tal como el PDF. Único ajuste: la nota azul también puede puntuar
-// "parcialmente" (el PDF la incluye en la fila completa pero no en la parcial).
+// Hoja corregida: máximo 245. La nota azul solo puntúa "completamente" (fila parcial = 3 notas).
 export const GC_JUNIOR_MISSIONS = [
   {
     id: 'm1',
@@ -125,7 +121,7 @@ export const GC_JUNIOR_MISSIONS = [
       { id: 'm6_a', label: 'Nota verde y/o roja completamente dentro de su zona objetivo y en posición vertical', count: true, max: 2, perItem: 15, totalMax: 30 },
       { id: 'm6_b', label: 'Nota verde y/o roja parcialmente dentro de su zona objetivo o no vertical', count: true, max: 2, perItem: 5, totalMax: null, mutualWith: 'm6_a', note: 'Cada nota puntúa en una sola fila' },
       { id: 'm6_c', label: 'Nota (blanca, negra, azul o amarilla) completamente dentro de su área objetivo', count: true, max: 4, perItem: 10, totalMax: 40 },
-      { id: 'm6_d', label: 'Nota (blanca, negra, azul o amarilla) parcialmente dentro de su área objetivo', count: true, max: 4, perItem: 5, totalMax: null, mutualWith: 'm6_c', note: 'Cada nota puntúa en una sola fila' },
+      { id: 'm6_d', label: 'Nota (blanca, negra o amarilla) parcialmente dentro de su área objetivo', count: true, max: 3, perItem: 5, totalMax: null, mutualWith: 'm6_c', note: 'Cada nota puntúa en una sola fila' },
     ]
   },
   {
@@ -143,7 +139,7 @@ export const GC_JUNIOR_MISSIONS = [
 export const GC_JUNIOR_MAX = 245
 
 // ─── SENIOR — Rescate Patrimonial en Joya de Cerén ──────────────────────────
-// Suma 215 tal como el PDF. Sin ajustes.
+// Hoja corregida: máximo 215 (sin cambios respecto a la original).
 export const GC_SENIOR_MISSIONS = [
   {
     id: 'm1',

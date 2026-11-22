@@ -88,7 +88,8 @@ export default function ScoreSheet({ team, category, round, missions, maxScore, 
       const next      = { ...s, [itemId]: newValue }
       const partnerId = mutualMap[itemId]
       if (partnerId !== undefined && newValue > 0) {
-        const sharedMax   = itemMaxMap[itemId]
+        // Límite compartido del par completo/parcial (el mayor de los dos; en RM siempre son iguales)
+        const sharedMax   = Math.max(itemMaxMap[itemId], itemMaxMap[partnerId])
         next[partnerId]   = Math.max(0, Math.min(s[partnerId] || 0, sharedMax - newValue))
       }
       return next
